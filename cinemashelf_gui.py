@@ -10,6 +10,8 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon, QFont, QPixmap
 import requests
 from colorama import init, Fore
+import io
+import sys
 
 # Import your existing modules
 from mover import move_movies
@@ -22,6 +24,17 @@ init(autoreset=True)
 
 CONFIG_FILE = Path("app_data/config.json")
 
+class LogRedirector(io.StringIO):
+    """Class to redirect stdout to a signal"""
+    def __init__(self, signal_func):
+        super(LogRedirector, self).__init__()
+        self.signal_func = signal_func
+        
+    def write(self, text):
+        if text.strip():  # Only emit non-empty strings
+            self.signal_func.emit(text)
+        return len(text)
+
 class WorkerThread(QThread):
     """Worker thread for background operations"""
     update_signal = pyqtSignal(str)
@@ -33,12 +46,19 @@ class WorkerThread(QThread):
         self.args = args
         
     def run(self):
+        # Redirect stdout to our signal
+        original_stdout = sys.stdout
+        sys.stdout = LogRedirector(self.update_signal)
+        
         try:
             self.task(*self.args)
             self.finished_signal.emit(True)
         except Exception as e:
             self.update_signal.emit(f"Error: {str(e)}")
             self.finished_signal.emit(False)
+        finally:
+            # Restore stdout
+            sys.stdout = original_stdout
 
 class CinemaShelfGUI(QMainWindow):
     def __init__(self):
@@ -176,9 +196,16 @@ class CinemaShelfGUI(QMainWindow):
         self.move_progress.setVisible(False)
         layout.addWidget(self.move_progress)
         
+        # Log group box
+        log_group = QGroupBox("Operation Log")
+        log_layout = QVBoxLayout()
+        
         self.move_log = QTextEdit()
         self.move_log.setReadOnly(True)
-        layout.addWidget(self.move_log)
+        log_layout.addWidget(self.move_log)
+        
+        log_group.setLayout(log_layout)
+        layout.addWidget(log_group)
         
         # Action button
         self.move_button = QPushButton("Start Moving Movies")
@@ -229,9 +256,16 @@ class CinemaShelfGUI(QMainWindow):
         self.fetch_progress.setVisible(False)
         layout.addWidget(self.fetch_progress)
         
+        # Log group box
+        log_group = QGroupBox("Operation Log")
+        log_layout = QVBoxLayout()
+        
         self.fetch_log = QTextEdit()
         self.fetch_log.setReadOnly(True)
-        layout.addWidget(self.fetch_log)
+        log_layout.addWidget(self.fetch_log)
+        
+        log_group.setLayout(log_layout)
+        layout.addWidget(log_group)
         
         # Action button
         self.fetch_button = QPushButton("Start Fetching Movie Info")
@@ -291,9 +325,16 @@ class CinemaShelfGUI(QMainWindow):
         self.cat_progress.setVisible(False)
         layout.addWidget(self.cat_progress)
         
+        # Log group box
+        log_group = QGroupBox("Operation Log")
+        log_layout = QVBoxLayout()
+        
         self.cat_log = QTextEdit()
         self.cat_log.setReadOnly(True)
-        layout.addWidget(self.cat_log)
+        log_layout.addWidget(self.cat_log)
+        
+        log_group.setLayout(log_layout)
+        layout.addWidget(log_group)
         
         # Action button
         self.cat_button = QPushButton("Start Categorizing Movies")
@@ -455,15 +496,11 @@ class CinemaShelfGUI(QMainWindow):
         # Clear log
         self.move_log.clear()
         
-        # Redirect stdout to log
-        def log_output(text):
-            self.move_log.append(text)
-            self.move_log.verticalScrollBar().setValue(
-                self.move_log.verticalScrollBar().maximum())
-                
         # Create and start worker thread
         self.move_worker = WorkerThread(move_movies, source, destination)
-        self.move_worker.update_signal.connect(log_output)
+        
+        # Connect log signal to log display function
+        self.move_worker.update_signal.connect(self.update_move_log)
         self.move_worker.finished_signal.connect(self.on_move_finished)
         
         # Update UI
@@ -474,6 +511,10 @@ class CinemaShelfGUI(QMainWindow):
         
         # Start worker
         self.move_worker.start()
+        
+    def update_move_log(self, text):
+        self.move_log.append(text)
+        self.move_log.ensureCursorVisible()
         
     def on_move_finished(self, success):
         self.move_button.setEnabled(True)
@@ -505,15 +546,11 @@ class CinemaShelfGUI(QMainWindow):
         # Clear log
         self.fetch_log.clear()
         
-        # Redirect stdout to log
-        def log_output(text):
-            self.fetch_log.append(text)
-            self.fetch_log.verticalScrollBar().setValue(
-                self.fetch_log.verticalScrollBar().maximum())
-                
         # Create and start worker thread
         self.fetch_worker = WorkerThread(fetch_movie_data, movies_dir, json_file, api_key, fetch_all)
-        self.fetch_worker.update_signal.connect(log_output)
+        
+        # Connect log signal to log display function
+        self.fetch_worker.update_signal.connect(self.update_fetch_log)
         self.fetch_worker.finished_signal.connect(self.on_fetch_finished)
         
         # Update UI
@@ -524,6 +561,10 @@ class CinemaShelfGUI(QMainWindow):
         
         # Start worker
         self.fetch_worker.start()
+        
+    def update_fetch_log(self, text):
+        self.fetch_log.append(text)
+        self.fetch_log.ensureCursorVisible()
         
     def on_fetch_finished(self, success):
         self.fetch_button.setEnabled(True)
@@ -562,17 +603,13 @@ class CinemaShelfGUI(QMainWindow):
         # Clear log
         self.cat_log.clear()
         
-        # Redirect stdout to log
-        def log_output(text):
-            self.cat_log.append(text)
-            self.cat_log.verticalScrollBar().setValue(
-                self.cat_log.verticalScrollBar().maximum())
-                
         # Create and start worker thread
         self.cat_worker = WorkerThread(create_shortcuts_and_categorize, 
                                       movies_dir, json_file, output_dir, 
                                       by_director, by_imdb, by_decade)
-        self.cat_worker.update_signal.connect(log_output)
+        
+        # Connect log signal to log display function
+        self.cat_worker.update_signal.connect(self.update_cat_log)
         self.cat_worker.finished_signal.connect(self.on_categorize_finished)
         
         # Update UI
@@ -583,6 +620,10 @@ class CinemaShelfGUI(QMainWindow):
         
         # Start worker
         self.cat_worker.start()
+        
+    def update_cat_log(self, text):
+        self.cat_log.append(text)
+        self.cat_log.ensureCursorVisible()
         
     def on_categorize_finished(self, success):
         self.cat_button.setEnabled(True)
