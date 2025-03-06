@@ -8,6 +8,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QProgressBar, QGroupBox, QFormLayout, QTextEdit)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon, QFont, QPixmap
+from PyQt5 import QtGui
+
 import requests
 from colorama import init, Fore
 import io
@@ -17,23 +19,96 @@ import sys
 from mover import move_movies
 from fetcher import fetch_movie_data
 from categorizer import create_shortcuts_and_categorize
-from main import reload_config
+from main import reload_config, reload_stats, reload_stats, get_stats
 
 # Initialize colorama
 init(autoreset=True)
 
 CONFIG_FILE = Path("app_data/config.json")
+STATS_FILE = Path("app_data/stats.json")
 
 class LogRedirector(io.StringIO):
-    """Class to redirect stdout to a signal"""
+    """Class to redirect stdout to a signal and convert ANSI colors to HTML for QTextEdit"""
     def __init__(self, signal_func):
         super(LogRedirector, self).__init__()
         self.signal_func = signal_func
+        self.ansi_color_map = {
+            # Regular colors
+            '30': 'black',
+            '31': 'red',
+            '32': 'green',
+            '33': 'orange',
+            '34': 'blue',
+            '35': 'purple',
+            '36': 'cyan',
+            '37': 'lightgray',
+            # Bright colors
+            '90': 'darkgray',
+            '91': 'lightred',
+            '92': 'lightgreen',
+            '93': 'yellow',
+            '94': 'lightblue',
+            '95': 'lightpurple',
+            '96': 'lightcyan',
+            '97': 'white',
+        }
+        self.buffer = ""
         
     def write(self, text):
         if text.strip():  # Only emit non-empty strings
-            self.signal_func.emit(text)
+            # Convert ANSI to HTML
+            html_text = self.ansi_to_html(text)
+            if html_text:
+                self.signal_func.emit(html_text)
         return len(text)
+    
+    def ansi_to_html(self, text):
+        """Convert ANSI color codes to HTML tags"""
+        result = ""
+        i = 0
+        length = len(text)
+        
+        while i < length:
+            if text[i:i+2] == '\x1b[':
+                # Found an ANSI escape sequence
+                j = i + 2
+                # Find the end of the sequence (usually 'm')
+                while j < length and text[j] not in 'mK':
+                    j += 1
+                
+                if j < length:
+                    # Extract the code
+                    code = text[i+2:j]
+                    codes = code.split(';')
+                    
+                    # Process color codes
+                    for c in codes:
+                        if c in self.ansi_color_map:
+                            result += f'<span style="color:{self.ansi_color_map[c]};">'
+                        elif c == '0':  # Reset
+                            result += '</span>'
+                    
+                    i = j + 1
+                    continue
+            
+            result += text[i]
+            i += 1
+            
+        return result
+
+# Also modify the update_log methods to handle HTML
+# def update_move_log(self, text):
+#     self.move_log.insertHtml(text + "<br>")
+#     self.move_log.ensureCursorVisible()
+
+# def update_fetch_log(self, text):
+#     self.fetch_log.insertHtml(text + "<br>")
+#     self.fetch_log.ensureCursorVisible()
+    
+# def update_cat_log(self, text):
+#     self.cat_log.insertHtml(text + "<br>")
+#     self.cat_log.ensureCursorVisible()
+    
 
 class WorkerThread(QThread):
     """Worker thread for background operations"""
@@ -135,34 +210,45 @@ class CinemaShelfGUI(QMainWindow):
         layout.addWidget(description)
         
         # Quick action buttons
-        quick_actions = QGroupBox("Quick Actions")
-        quick_layout = QHBoxLayout()
+        # quick_actions = QGroupBox("Quick Actions")
+        # quick_layout = QHBoxLayout()
         
-        move_btn = QPushButton("Move Movies")
-        move_btn.clicked.connect(lambda: self.tabWidget().setCurrentIndex(1))
+        # move_btn = QPushButton("Move Movies")
+        # move_btn.clicked.connect(lambda: self.tabWidget().setCurrentIndex(1))
         
-        fetch_btn = QPushButton("Fetch Movie Info")
-        fetch_btn.clicked.connect(lambda: self.tabWidget().setCurrentIndex(2))
+        # fetch_btn = QPushButton("Fetch Movie Info")
+        # fetch_btn.clicked.connect(lambda: self.tabWidget().setCurrentIndex(2))
         
-        categorize_btn = QPushButton("Categorize Movies")
-        categorize_btn.clicked.connect(lambda: self.tabWidget().setCurrentIndex(3))
+        # categorize_btn = QPushButton("Categorize Movies")
+        # categorize_btn.clicked.connect(lambda: self.tabWidget().setCurrentIndex(3))
         
-        quick_layout.addWidget(move_btn)
-        quick_layout.addWidget(fetch_btn)
-        quick_layout.addWidget(categorize_btn)
+        # quick_layout.addWidget(move_btn)
+        # quick_layout.addWidget(fetch_btn)
+        # quick_layout.addWidget(categorize_btn)
         
-        quick_actions.setLayout(quick_layout)
-        layout.addWidget(quick_actions)
+        # quick_actions.setLayout(quick_layout)
+        # layout.addWidget(quick_actions)
         
         # Stats section (can be populated later with actual data)
         stats = QGroupBox("Collection Statistics")
         stats_layout = QFormLayout()
+        self.movies_label = QLabel("")
+        self.director_label = QLabel("")
+        self.rating_label = QLabel("")
+        self.oldest_movie_label = QLabel("")
+        self.newest_movie_label = QLabel("")
         
-        stats_layout.addRow("Movies in collection:", QLabel("0"))
-        stats_layout.addRow("Top director:", QLabel("N/A"))
-        stats_layout.addRow("Average IMDb rating:", QLabel("N/A"))
+        self.reload_stats_button()
+        stats_layout.addRow("Movies in collection:", self.movies_label)
+        stats_layout.addRow("Top director:", self.director_label)
+        stats_layout.addRow("Average IMDb rating:", self.rating_label)
+        stats_layout.addRow("Oldest movie:", self.oldest_movie_label)
+        stats_layout.addRow("Newest movie:", self.newest_movie_label)
         
+        reload_stat_btn = QPushButton("Reload stats")
+        reload_stat_btn.clicked.connect(self.reload_stats_button)
         stats.setLayout(stats_layout)
+        stats_layout.addWidget(reload_stat_btn)
         layout.addWidget(stats)
         
         self.home_tab.setLayout(layout)
@@ -460,7 +546,18 @@ class CinemaShelfGUI(QMainWindow):
         self.update_settings_labels()
         
         QMessageBox.information(self, "Configuration", "Configuration saved successfully!")
-        
+    def reload_stats_button(self):
+        try:
+            reload_stats()
+            self.stats = get_stats()
+            self.movies_label.setText(str(self.stats['movies']))
+            self.director_label.setText(self.stats['director'])
+            self.rating_label.setText(str(self.stats["rating"]))
+            self.oldest_movie_label.setText(self.stats["oldest_movie"])
+            self.newest_movie_label.setText(self.stats["newest_movie"])
+        except Exception as e:
+            print("Error loading stats:", e)
+    
     def update_settings_labels(self):
         # Update Move tab
         self.move_source_label.setText(self.source_folder_input.text())
@@ -512,9 +609,11 @@ class CinemaShelfGUI(QMainWindow):
         # Start worker
         self.move_worker.start()
         
+    
     def update_move_log(self, text):
-        self.move_log.append(text)
+        self.move_log.insertHtml(text + "<br>")
         self.move_log.ensureCursorVisible()
+
         
     def on_move_finished(self, success):
         self.move_button.setEnabled(True)
@@ -562,8 +661,9 @@ class CinemaShelfGUI(QMainWindow):
         # Start worker
         self.fetch_worker.start()
         
+    
     def update_fetch_log(self, text):
-        self.fetch_log.append(text)
+        self.fetch_log.insertHtml(text + "<br>")
         self.fetch_log.ensureCursorVisible()
         
     def on_fetch_finished(self, success):
@@ -622,9 +722,10 @@ class CinemaShelfGUI(QMainWindow):
         self.cat_worker.start()
         
     def update_cat_log(self, text):
-        self.cat_log.append(text)
+        self.cat_log.insertHtml(text + "<br>")
         self.cat_log.ensureCursorVisible()
-        
+    
+
     def on_categorize_finished(self, success):
         self.cat_button.setEnabled(True)
         self.cat_progress.setVisible(False)
@@ -639,6 +740,7 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle('Fusion')  # Modern cross-platform style
     window = CinemaShelfGUI()
+    window.setWindowIcon(QtGui.QIcon("cinema_icon.ico"))
     window.show()
     sys.exit(app.exec_())
 
