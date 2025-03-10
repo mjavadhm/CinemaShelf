@@ -144,6 +144,8 @@ class CinemaShelfGUI(QMainWindow):
     def initUI(self):
         # Window settings
         self.setWindowTitle("CinemaShelf 🎬")
+        self.setStyleSheet("background-color: #f0f0f0;")  # Set a light background color
+
         self.setMinimumSize(800, 600)
         
         # Main widget and layout
@@ -295,6 +297,8 @@ class CinemaShelfGUI(QMainWindow):
         
         # Action button
         self.move_button = QPushButton("Start Moving Movies")
+        self.move_button.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")  # Modern button style
+
         self.move_button.clicked.connect(self.start_move_movies)
         layout.addWidget(self.move_button)
         
@@ -355,6 +359,8 @@ class CinemaShelfGUI(QMainWindow):
         
         # Action button
         self.fetch_button = QPushButton("Start Fetching Movie Info")
+        self.fetch_button.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")  # Modern button style
+
         self.fetch_button.clicked.connect(self.start_fetch_movie_info)
         layout.addWidget(self.fetch_button)
         
@@ -424,6 +430,8 @@ class CinemaShelfGUI(QMainWindow):
         
         # Action button
         self.cat_button = QPushButton("Start Categorizing Movies")
+        self.cat_button.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold;")  # Modern button style
+
         self.cat_button.clicked.connect(self.start_categorize_movies)
         layout.addWidget(self.cat_button)
         
