@@ -9,6 +9,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon, QFont, QPixmap
 from PyQt5 import QtGui
+from qdarkstyle import load_stylesheet_pyqt5  # Import QDarkStyle for dark mode
+
 
 import requests
 from colorama import init, Fore
@@ -144,19 +146,151 @@ class CinemaShelfGUI(QMainWindow):
     def initUI(self):
         # Window settings
         self.setWindowTitle("CinemaShelf 🎬")
-        self.setStyleSheet("background-color: #f0f0f0;")  # Set a light background color
-
-        self.setMinimumSize(800, 600)
+        
+        # Custom modern stylesheet
+        base_style = """
+            QMainWindow {
+                background-color: #1e1e1e;
+            }
+            QWidget {
+                font-family: 'Segoe UI', Arial, sans-serif;
+                color: #ffffff;
+            }
+            QTabWidget::pane {
+                border: none;
+                background-color: #2d2d2d;
+                border-radius: 8px;
+            }
+            QTabBar::tab {
+                background-color: #383838;
+                color: #ffffff;
+                padding: 8px 16px;
+                margin: 2px;
+                border: none;
+                border-radius: 4px;
+            }
+            QTabBar::tab:selected {
+                background-color: #0078d4;
+            }
+            QTabBar::tab:hover:!selected {
+                background-color: #424242;
+            }
+            QPushButton {
+                background-color: #0078d4;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 14px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                margin: 4px;
+                min-width: 120px;
+            }
+            QPushButton:hover {
+                background-color: #1084d8;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+                transform: translateY(-1px);
+            }
+            QPushButton:pressed {
+                background-color: #006cbd;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+                transform: translateY(1px);
+            }
+            QPushButton:disabled {
+                background-color: #666666;
+                color: #999999;
+            }
+            QLineEdit {
+                padding: 6px;
+                border: 1px solid #424242;
+                border-radius: 4px;
+                background-color: #2d2d2d;
+                color: white;
+            }
+            QLineEdit:focus {
+                border: 1px solid #0078d4;
+            }
+            QGroupBox {
+                background-color: #2d2d2d;
+                border: none;
+                border-radius: 8px;
+                margin-top: 12px;
+                padding: 12px;
+            }
+            QGroupBox::title {
+                color: #ffffff;
+                subcontrol-origin: margin;
+                left: 12px;
+                padding: 0 5px;
+            }
+            QTextEdit {
+                background-color: #1e1e1e;
+                border: 1px solid #424242;
+                border-radius: 4px;
+                padding: 4px;
+                color: #ffffff;
+            }
+            QProgressBar {
+                border: none;
+                border-radius: 4px;
+                background-color: #2d2d2d;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #0078d4;
+                border-radius: 4px;
+            }
+            QCheckBox {
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 3px;
+                border: 1px solid #424242;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #0078d4;
+                border: none;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+        """
+        self.setStyleSheet(base_style)
+        self.setMinimumSize(900, 700)
         
         # Main widget and layout
         main_widget = QWidget()
         main_layout = QVBoxLayout()
         
         # Header with logo
+        header_container = QWidget()
+        header_container.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                border-radius: 8px;
+                margin: 8px;
+                padding: 16px;
+            }
+        """)
+        header_layout = QVBoxLayout()
+        
         header = QLabel("CinemaShelf 🎬")
-        header.setFont(QFont("Arial", 24, QFont.Bold))
+        header.setFont(QFont("Segoe UI", 28, QFont.Bold))
         header.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(header)
+        header.setStyleSheet("color: #0078d4;")
+        
+        subtitle = QLabel("Your Personal Movie Collection Manager")
+        subtitle.setFont(QFont("Segoe UI", 12))
+        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setStyleSheet("color: #cccccc;")
+        
+        header_layout.addWidget(header)
+        header_layout.addWidget(subtitle)
+        header_container.setLayout(header_layout)
+        main_layout.addWidget(header_container)
         
         # Tab widget to organize features
         tabs = QTabWidget()
@@ -248,6 +382,16 @@ class CinemaShelfGUI(QMainWindow):
         stats_layout.addRow("Newest movie:", self.newest_movie_label)
         
         reload_stat_btn = QPushButton("Reload stats")
+        reload_stat_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                padding: 8px 16px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #4f4f4f;
+            }
+        """)
         reload_stat_btn.clicked.connect(self.reload_stats_button)
         stats.setLayout(stats_layout)
         stats_layout.addWidget(reload_stat_btn)
@@ -297,7 +441,18 @@ class CinemaShelfGUI(QMainWindow):
         
         # Action button
         self.move_button = QPushButton("Start Moving Movies")
-        self.move_button.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")  # Modern button style
+        self.move_button.setStyleSheet("""
+            background-color: #4CAF50;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            margin: 4px;
+            min-width: 120px;
+            transition: all 0.2s ease-in-out;
+        """)  # Green color for move action
+        self.move_button.setIcon(QIcon("app_data/icons/move_icon.png"))  # Add move icon from correct location
+        self.move_button.setToolTip("Start moving movies")  # Add tooltip for better UX
 
         self.move_button.clicked.connect(self.start_move_movies)
         layout.addWidget(self.move_button)
@@ -359,7 +514,17 @@ class CinemaShelfGUI(QMainWindow):
         
         # Action button
         self.fetch_button = QPushButton("Start Fetching Movie Info")
-        self.fetch_button.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")  # Modern button style
+        self.fetch_button.setStyleSheet("""
+            background-color: #2196F3;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            margin: 4px;
+            min-width: 120px;
+            transition: all 0.2s ease-in-out;
+        """)  # Blue color for fetch action
+        self.fetch_button.setIcon(QIcon("app_data/icons/fetch_icon.png"))  # Add fetch icon from correct location
 
         self.fetch_button.clicked.connect(self.start_fetch_movie_info)
         layout.addWidget(self.fetch_button)
@@ -430,7 +595,17 @@ class CinemaShelfGUI(QMainWindow):
         
         # Action button
         self.cat_button = QPushButton("Start Categorizing Movies")
-        self.cat_button.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold;")  # Modern button style
+        self.cat_button.setStyleSheet("""
+            background-color: #FF9800;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            margin: 4px;
+            min-width: 120px;
+            transition: all 0.2s ease-in-out;
+        """)  # Orange color for categorize action
+        self.cat_button.setIcon(QIcon("app_data/icons/categorize_icon.png"))  # Add categorize icon from correct location
 
         self.cat_button.clicked.connect(self.start_categorize_movies)
         layout.addWidget(self.cat_button)
@@ -445,6 +620,16 @@ class CinemaShelfGUI(QMainWindow):
         # Source folder
         self.source_folder_input = QLineEdit()
         browse_source = QPushButton("Browse...")
+        browse_source.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                padding: 8px 16px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #4f4f4f;
+            }
+        """)
         browse_source.clicked.connect(lambda: self.browse_folder(self.source_folder_input))
         
         source_layout = QHBoxLayout()
@@ -456,6 +641,16 @@ class CinemaShelfGUI(QMainWindow):
         # All movies folder
         self.all_movies_input = QLineEdit()
         browse_all = QPushButton("Browse...")
+        browse_all.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                padding: 8px 16px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #4f4f4f;
+            }
+        """)
         browse_all.clicked.connect(lambda: self.browse_folder(self.all_movies_input))
         
         all_layout = QHBoxLayout()
@@ -467,6 +662,16 @@ class CinemaShelfGUI(QMainWindow):
         # JSON file
         self.json_file_input = QLineEdit()
         browse_json = QPushButton("Browse...")
+        browse_json.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                padding: 8px 16px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #4f4f4f;
+            }
+        """)
         browse_json.clicked.connect(lambda: self.browse_file(self.json_file_input))
         
         json_layout = QHBoxLayout()
@@ -478,6 +683,16 @@ class CinemaShelfGUI(QMainWindow):
         # Categorized directory
         self.categorized_dir_input = QLineEdit()
         browse_cat = QPushButton("Browse...")
+        browse_cat.setStyleSheet("""
+            QPushButton {
+                background-color: #424242;
+                padding: 8px 16px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #4f4f4f;
+            }
+        """)
         browse_cat.clicked.connect(lambda: self.browse_folder(self.categorized_dir_input))
         
         cat_layout = QHBoxLayout()
@@ -496,6 +711,17 @@ class CinemaShelfGUI(QMainWindow):
         
         # Save button
         save_button = QPushButton("Save Configuration")
+        save_button.setStyleSheet("""
+            QPushButton {
+                background-color: #0078d4;
+                padding: 12px 24px;
+                min-width: 120px;
+                transition: all 0.2s ease-in-out;
+            }
+            QPushButton:hover {
+                background-color: #1084d8;
+            }
+        """)
         save_button.clicked.connect(self.save_config)
         layout.addWidget(save_button)
         
@@ -511,7 +737,8 @@ class CinemaShelfGUI(QMainWindow):
         if file:
             line_edit.setText(file)
             
-    def load_config(self):
+    def load_config(self):  # Load configuration settings from JSON file
+
         if CONFIG_FILE.exists():
             with open(CONFIG_FILE, "r") as f:
                 config = json.load(f)
@@ -537,7 +764,8 @@ class CinemaShelfGUI(QMainWindow):
         # Update labels in other tabs
         self.update_settings_labels()
         
-    def save_config(self):
+    def save_config(self):  # Save configuration settings to JSON file
+
         config = {
             "SOURCE_MOVIES": self.source_folder_input.text(),
             "ALL_MOVIES": self.all_movies_input.text(),
@@ -618,7 +846,8 @@ class CinemaShelfGUI(QMainWindow):
         self.move_worker.start()
         
     
-    def update_move_log(self, text):
+    def update_move_log(self, text):  # Update the move log display
+
         self.move_log.insertHtml(text + "<br>")
         self.move_log.ensureCursorVisible()
 
@@ -670,7 +899,8 @@ class CinemaShelfGUI(QMainWindow):
         self.fetch_worker.start()
         
     
-    def update_fetch_log(self, text):
+    def update_fetch_log(self, text):  # Update the fetch log display
+
         self.fetch_log.insertHtml(text + "<br>")
         self.fetch_log.ensureCursorVisible()
         
@@ -729,7 +959,8 @@ class CinemaShelfGUI(QMainWindow):
         # Start worker
         self.cat_worker.start()
         
-    def update_cat_log(self, text):
+    def update_cat_log(self, text):  # Update the categorize log display
+
         self.cat_log.insertHtml(text + "<br>")
         self.cat_log.ensureCursorVisible()
     
