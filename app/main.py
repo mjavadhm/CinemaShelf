@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.errors import ApplicationError
 from app.modules.library.router import router as library_router
 from app.modules.metadata.router import router as metadata_router
+from app.modules.personal.router import router as personal_router
 from app.modules.playback.router import router as playback_router
 from app.modules.sources.router import router as sources_router
 
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(library_router)
     app.include_router(sources_router)
     app.include_router(playback_router)
+    app.include_router(personal_router)
 
     return app
 

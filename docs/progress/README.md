@@ -11,7 +11,7 @@ This directory documents the technical implementation plans, architectural decis
 | **Phase 1** | Core Data, Library & Metadata Catalog | [Phase 1 Plan](phase-1-plan.md) | [Phase 1 Walkthrough](phase-1-walkthrough.md) | Completed & Tested |
 | **Phase 2** | Sources & Download Pipeline (Aria2 + Zarfilm) | [Phase 2 Plan](phase-2-plan.md) | [Phase 2 Walkthrough](phase-2-walkthrough.md) | Completed & Tested |
 | **Phase 3** | Playback & File Access | [Phase 3 Plan](phase-3-plan.md) | [Phase 3 Walkthrough](phase-3-walkthrough.md) | Completed & Tested |
-| **Phase 4** | Personalization, Ratings & Custom Lists | *Upcoming* | *Upcoming* | Pending |
+| **Phase 4** | Personalization, Ratings & Custom Lists | [Phase 4 Plan](phase-4-plan.md) | [Phase 4 Walkthrough](phase-4-walkthrough.md) | Completed & Tested |
 | **Phase 5** | Letterboxd Integrations & Sync | *Upcoming* | *Upcoming* | Pending |
 | **Phase 6** | Hardening & Deployment | *Upcoming* | *Upcoming* | Pending |
 
