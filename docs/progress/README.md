@@ -12,7 +12,7 @@ This directory documents the technical implementation plans, architectural decis
 | **Phase 2** | Sources & Download Pipeline (Aria2 + Zarfilm) | [Phase 2 Plan](phase-2-plan.md) | [Phase 2 Walkthrough](phase-2-walkthrough.md) | Completed & Tested |
 | **Phase 3** | Playback & File Access | [Phase 3 Plan](phase-3-plan.md) | [Phase 3 Walkthrough](phase-3-walkthrough.md) | Completed & Tested |
 | **Phase 4** | Personalization, Ratings & Custom Lists | [Phase 4 Plan](phase-4-plan.md) | [Phase 4 Walkthrough](phase-4-walkthrough.md) | Completed & Tested |
-| **Phase 5** | Letterboxd Integrations & Sync | [Phase 5 Plan](phase-5-plan.md) | *Upcoming* | In Planning / Approved |
+| **Phase 5** | Letterboxd Integrations & Sync | [Phase 5 Plan](phase-5-plan.md) | [Phase 5 Walkthrough](phase-5-walkthrough.md) | Completed & Tested |
 | **Phase 6** | Hardening & Deployment | *Upcoming* | *Upcoming* | Pending |
 
 ---

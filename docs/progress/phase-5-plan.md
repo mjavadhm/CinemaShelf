@@ -130,7 +130,9 @@ Implement `LetterboxdClient` complying with `LetterboxdPort`:
 - **Port Protocol**:
   ```python
   class LetterboxdPort(Protocol):
-      def parse_csv(self, content: str | bytes, filename: str | None = None) -> list[LetterboxdItem]: ...
+      def parse_csv(
+          self, content: str | bytes, filename: str | None = None
+      ) -> list[LetterboxdItem]: ...
       def parse_zip_export(self, zip_bytes: bytes) -> LetterboxdExportArchive: ...
   ```
 - **Methods**:

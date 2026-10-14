@@ -1,0 +1,145 @@
+"""Unit tests for Letterboxd CSV and ZIP export parsing adapter."""
+
+import io
+import zipfile
+from datetime import date
+
+import pytest
+
+from app.adapters.letterboxd import (
+    LetterboxdClient,
+    LetterboxdItemType,
+)
+
+
+@pytest.fixture
+def adapter() -> LetterboxdClient:
+    return LetterboxdClient()
+
+
+def test_parse_standard_watchlist_csv(adapter: LetterboxdClient) -> None:
+    content = """Date,Name,Year,Letterboxd URI
+2024-01-10,Children of Men,2006,https://boxd.it/29pC
+2024-01-11,Ex Machina,2014,https://boxd.it/70zS
+"""
+    items = adapter.parse_csv(content, filename="watchlist.csv")
+    assert len(items) == 2
+    assert items[0].title == "Children of Men"
+    assert items[0].release_year == 2006
+    assert items[0].letterboxd_uri == "https://boxd.it/29pC"
+    assert items[0].entry_type == LetterboxdItemType.WATCHLIST
+    assert items[0].date_logged == date(2024, 1, 10)
+
+    assert items[1].title == "Ex Machina"
+    assert items[1].release_year == 2014
+
+
+def test_parse_legacy_simple_csv(adapter: LetterboxdClient) -> None:
+    content = """Name,Year
+Sympathy for Mr. Vengeance,2002
+Lady Vengeance,2005
+"""
+    items = adapter.parse_csv(content)
+    assert len(items) == 2
+    assert items[0].title == "Sympathy for Mr. Vengeance"
+    assert items[0].release_year == 2002
+    assert items[0].entry_type == LetterboxdItemType.WATCHLIST
+
+
+def test_parse_ratings_csv(adapter: LetterboxdClient) -> None:
+    content = """Date,Name,Year,Letterboxd URI,Rating
+2023-05-12,The Social Network,2010,https://boxd.it/17yM,4.5
+2023-05-15,Festen,1998,https://boxd.it/1b1G,4.0
+"""
+    items = adapter.parse_csv(content, filename="ratings.csv")
+    assert len(items) == 2
+    assert items[0].title == "The Social Network"
+    assert items[0].rating == 4.5
+    assert items[0].entry_type == LetterboxdItemType.RATING
+    assert items[1].rating == 4.0
+
+
+def test_parse_diary_csv(adapter: LetterboxdClient) -> None:
+    content = """Date,Name,Year,Letterboxd URI,Rating,Rewatch,Tags,Watched Date
+2023-08-01,The Master,2012,https://boxd.it/2W34,5.0,Yes,"pta, 35mm",2023-07-31
+"""
+    items = adapter.parse_csv(content, filename="diary.csv")
+    assert len(items) == 1
+    assert items[0].title == "The Master"
+    assert items[0].rating == 5.0
+    assert items[0].is_rewatch is True
+    assert items[0].watched_date == date(2023, 7, 31)
+    assert items[0].tags == ["pta", "35mm"]
+    assert items[0].entry_type == LetterboxdItemType.DIARY
+
+
+def test_parse_custom_list_csv(adapter: LetterboxdClient) -> None:
+    content = """Position,Name,Year,URL,Description
+1,Cure,1997,https://boxd.it/170g,Masterpiece psychological thriller
+2,Identity,2003,https://boxd.it/289q,Fun rainy motel mystery
+"""
+    items = adapter.parse_csv(
+        content,
+        filename="favorite-thrillers.csv",
+        default_type=LetterboxdItemType.LIST,
+        list_name="Favorite Thrillers",
+    )
+    assert len(items) == 2
+    assert items[0].title == "Cure"
+    assert items[0].list_rank == 1
+    assert items[0].review_text == "Masterpiece psychological thriller"
+    assert items[0].list_name == "Favorite Thrillers"
+    assert items[1].list_rank == 2
+
+
+def test_parse_utf8_bom_content(adapter: LetterboxdClient) -> None:
+    raw_bytes = b"\xef\xbb\xbfName,Year\nUnbreakable,2000\n"
+    items = adapter.parse_csv(raw_bytes)
+    assert len(items) == 1
+    assert items[0].title == "Unbreakable"
+    assert items[0].release_year == 2000
+
+
+def test_parse_empty_csv(adapter: LetterboxdClient) -> None:
+    assert adapter.parse_csv("") == []
+    assert adapter.parse_csv("Name,Year\n") == []
+
+
+def test_parse_zip_export(adapter: LetterboxdClient) -> None:
+    # Build in-memory ZIP with watchlist, ratings, and a custom list
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        zf.writestr(
+            "watchlist.csv",
+            "Date,Name,Year,Letterboxd URI\n2024-01-01,In the House,2012,https://boxd.it/4kik\n",
+        )
+        zf.writestr(
+            "ratings.csv",
+            "Date,Name,Year,Letterboxd URI,Rating\n2024-01-02,Dogtooth,2009,https://boxd.it/1r2S,4.0\n",
+        )
+        zf.writestr(
+            "lists/top-noir.csv",
+            "Position,Name,Year,URL\n1,Primal Fear,1996,https://boxd.it/1Y6g\n",
+        )
+
+    zip_bytes = zip_buffer.getvalue()
+    archive = adapter.parse_zip_export(zip_bytes)
+
+    assert len(archive.watchlist) == 1
+    assert archive.watchlist[0].title == "In the House"
+    assert archive.watchlist[0].entry_type == LetterboxdItemType.WATCHLIST
+
+    assert len(archive.ratings) == 1
+    assert archive.ratings[0].title == "Dogtooth"
+    assert archive.ratings[0].rating == 4.0
+
+    assert "Top Noir" in archive.lists
+    assert len(archive.lists["Top Noir"]) == 1
+    assert archive.lists["Top Noir"][0].title == "Primal Fear"
+
+    assert len(archive.all_items) == 3
+
+
+def test_parse_invalid_zip_raises_error(adapter: LetterboxdClient) -> None:
+    with pytest.raises(ValueError, match="Invalid ZIP archive"):
+        adapter.parse_zip_export(b"this is not a zip file")

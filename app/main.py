@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from app.bootstrap import shutdown_app, startup_app
 from app.core.config import get_settings
 from app.core.errors import ApplicationError
+from app.modules.integrations.router import router as integrations_router
 from app.modules.library.router import router as library_router
 from app.modules.metadata.router import router as metadata_router
 from app.modules.personal.router import router as personal_router
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(sources_router)
     app.include_router(playback_router)
     app.include_router(personal_router)
+    app.include_router(integrations_router)
 
     return app
 
