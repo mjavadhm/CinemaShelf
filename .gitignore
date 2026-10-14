@@ -1,0 +1,60 @@
+# Legacy reference files (for initial agent reference only — DO NOT COMMIT)
+legacy/
+originals/
+
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+env/
+
+# Local Runtime Data & Databases
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+logs/
+*.log
+
+# Browser Profiles & Secrets
+.env
+.env.*
+!.env.example
+chrome_profile/
+browser_profiles/
+
+# Testing & Tooling Cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

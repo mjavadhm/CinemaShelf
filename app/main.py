@@ -1,0 +1,54 @@
+"""FastAPI application entry point for CinemaShelf."""
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
+from app.bootstrap import shutdown_app, startup_app
+from app.core.config import get_settings
+from app.core.errors import ApplicationError
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Manage explicit application startup and shutdown lifecycle."""
+    settings = get_settings()
+    startup_app(settings)
+    try:
+        yield
+    finally:
+        shutdown_app()
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application instance."""
+    settings = get_settings()
+    app = FastAPI(
+        title="CinemaShelf",
+        version="0.1.0",
+        description="Local-first personal movie library and download manager",
+        lifespan=lifespan,
+    )
+
+    @app.exception_handler(ApplicationError)
+    async def application_error_handler(request, exc: ApplicationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message,
+                    "request_id": getattr(request.state, "request_id", None),
+                }
+            },
+        )
+
+    @app.get("/health", tags=["system"])
+    async def health_check() -> dict[str, str]:
+        return {"status": "ok", "environment": settings.app_env}
+
+    return app
+
+
+app = create_app()
