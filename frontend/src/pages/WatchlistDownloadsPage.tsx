@@ -23,7 +23,13 @@ import { LetterboxdImportModal } from '../components/LetterboxdImportModal';
 export const WatchlistDownloadsPage: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  const { data: watchlistWorks, isLoading: isLoadingWatchlist } = useWatchlistWorks();
+  const {
+    data: watchlistWorks,
+    isLoading: isLoadingWatchlist,
+    isError: isWatchlistError,
+    error: watchlistError,
+    refetch: refetchWatchlist,
+  } = useWatchlistWorks();
   const { toggleWatchlist } = usePersonalActions();
   const { openFileLocation } = usePlaybackLaunch();
 
@@ -82,8 +88,24 @@ export const WatchlistDownloadsPage: React.FC = () => {
           </div>
         )}
 
+        {/* Watchlist Error State */}
+        {isWatchlistError && (
+          <div className="p-6 bg-red-950/20 border border-red-500/30 rounded-xl text-center space-y-3">
+            <p className="text-red-400 font-bold text-xs">خطا در دریافت لیست تماشا</p>
+            <p className="text-slate-400 text-[11px] font-mono">
+              {(watchlistError as any)?.message || 'ارتباط با سرور برقرار نشد'}
+            </p>
+            <button
+              onClick={() => refetchWatchlist()}
+              className="px-3 py-1.5 rounded-lg bg-shelf-card hover:bg-slate-800 text-slate-200 border border-shelf-border text-xs"
+            >
+              تلاش مجدد
+            </button>
+          </div>
+        )}
+
         {/* Empty Watchlist */}
-        {!isLoadingWatchlist && (!watchlistWorks || watchlistWorks.length === 0) && (
+        {!isLoadingWatchlist && !isWatchlistError && (!watchlistWorks || watchlistWorks.length === 0) && (
           <div className="p-8 text-center bg-shelf-card border border-shelf-border rounded-xl space-y-2">
             <p className="text-slate-300 text-xs font-bold">واچ‌لیست شما خالی است</p>
             <p className="text-slate-500 text-[11px]">
@@ -96,21 +118,26 @@ export const WatchlistDownloadsPage: React.FC = () => {
         {!isLoadingWatchlist && watchlistWorks && watchlistWorks.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
             {watchlistWorks.map((item) => {
-              const movie = item.work;
+              const workId = item.work_id;
+              const displayTitle = item.persian_title || item.title;
+              const originalTitle = item.title;
+              const releaseYear = item.release_year;
+              const posterPath = item.poster_path;
+
               return (
                 <div
-                  key={movie.id}
+                  key={workId}
                   className="bg-shelf-card border border-shelf-border rounded-xl overflow-hidden flex flex-col justify-between shadow-md hover:border-shelf-amber/50 transition"
                 >
-                  <Link to={`/works/${movie.id}`} className="relative aspect-[2/3] bg-slate-900 block overflow-hidden">
+                  <Link to={`/works/${workId}`} className="relative aspect-[2/3] bg-slate-900 block overflow-hidden">
                     <img
-                      src={getTmdbImageUrl(movie.poster_path, 'w500')}
-                      alt={movie.title}
+                      src={getTmdbImageUrl(posterPath, 'w500')}
+                      alt={displayTitle}
                       className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                     />
-                    {movie.release_year && (
+                    {releaseYear && (
                       <span className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/80 text-shelf-amber font-mono text-[10px] font-bold border border-white/10">
-                        {movie.release_year}
+                        {releaseYear}
                       </span>
                     )}
                   </Link>
@@ -118,23 +145,23 @@ export const WatchlistDownloadsPage: React.FC = () => {
                   <div className="p-3 space-y-2.5">
                     <div>
                       <h3 className="font-bold text-xs text-white line-clamp-1">
-                        {movie.persian_title || movie.title}
+                        {displayTitle}
                       </h3>
                       <p className="text-[11px] text-slate-400 font-mono truncate" dir="ltr">
-                        {movie.title}
+                        {originalTitle}
                       </p>
                     </div>
 
                     <div className="flex gap-1.5">
                       <Link
-                        to={`/works/${movie.id}`}
+                        to={`/works/${workId}`}
                         className="flex-1 py-1.5 rounded-lg bg-shelf-amber hover:bg-shelf-amberHover text-black font-bold text-xs flex items-center justify-center gap-1.5 transition"
                       >
                         <ArrowDownCircle className="w-3.5 h-3.5" />
                         <span>مشاهده و دانلود</span>
                       </Link>
                       <button
-                        onClick={() => toggleWatchlist(movie.id, false)}
+                        onClick={() => toggleWatchlist(workId, false)}
                         title="حذف از واچ‌لیست"
                         className="p-1.5 rounded-lg bg-shelf-bg hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-shelf-border transition"
                       >
@@ -196,12 +223,12 @@ export const WatchlistDownloadsPage: React.FC = () => {
         {!isLoadingDownloads && tasks.length > 0 && (
           <div className="space-y-3">
             {tasks.map((task) => {
-              const downloadedGb = (task.downloaded_bytes / (1024 * 1024 * 1024)).toFixed(2);
+              const downloadedGb = ((task.downloaded_bytes ?? 0) / (1024 * 1024 * 1024)).toFixed(2);
               const totalGb = task.total_bytes
                 ? (task.total_bytes / (1024 * 1024 * 1024)).toFixed(2)
                 : '—';
-              const speedMb = (task.download_speed_bps / (1024 * 1024)).toFixed(2);
-              const progressPct = task.progress_percent.toFixed(1);
+              const speedMb = ((task.download_speed_bps ?? 0) / (1024 * 1024)).toFixed(2);
+              const progressPct = (task.progress_percent ?? 0).toFixed(1);
 
               return (
                 <div
@@ -243,7 +270,7 @@ export const WatchlistDownloadsPage: React.FC = () => {
                             ? 'bg-red-500'
                             : 'bg-shelf-amber'
                         }`}
-                        style={{ width: `${Math.min(100, Math.max(0, task.progress_percent))}%` }}
+                        style={{ width: `${Math.min(100, Math.max(0, task.progress_percent ?? 0))}%` }}
                       />
                     </div>
                   </div>

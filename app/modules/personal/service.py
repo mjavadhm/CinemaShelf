@@ -521,6 +521,7 @@ class PersonalService:
                 work_id=work.id,
                 title=work.title,
                 original_title=work.original_title,
+                persian_title=work.persian_title,
                 release_year=work.release_year,
                 poster_path=work.poster_path,
                 tmdb_rating=work.tmdb_rating,

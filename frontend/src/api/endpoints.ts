@@ -11,6 +11,7 @@ import {
   MediaWorkSummary,
   PersonDetail,
   PersonalRecord,
+  PersonalWorkCatalogItem,
   SourceRelease,
   StorageVolume,
   WatchStatusResult,
@@ -355,8 +356,8 @@ export async function filterPersonalCatalog(params?: {
   sort_order?: string;
   limit?: number;
   offset?: number;
-}): Promise<Array<{ work: MediaWorkSummary; personal_record?: PersonalRecord | null }>> {
-  const response = await apiClient.get('/personal/works', { params });
+}): Promise<PersonalWorkCatalogItem[]> {
+  const response = await apiClient.get<PersonalWorkCatalogItem[]>('/personal/works', { params });
   return response.data;
 }
 

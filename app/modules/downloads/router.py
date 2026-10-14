@@ -72,14 +72,23 @@ def get_aria2_stats(
     service: Annotated[SourcesService, Depends(get_sources_service)],
 ) -> Aria2StatsResponse:
     """Fetch global download speeds and task counts from Aria2."""
-    stats = service.get_aria2_stats()
-    return Aria2StatsResponse(
-        download_speed=stats.download_speed,
-        upload_speed=stats.upload_speed,
-        num_active=stats.num_active,
-        num_waiting=stats.num_waiting,
-        num_stopped=stats.num_stopped,
-    )
+    try:
+        stats = service.get_aria2_stats()
+        return Aria2StatsResponse(
+            download_speed=stats.download_speed,
+            upload_speed=stats.upload_speed,
+            num_active=stats.num_active,
+            num_waiting=stats.num_waiting,
+            num_stopped=stats.num_stopped,
+        )
+    except Exception:
+        return Aria2StatsResponse(
+            download_speed=0,
+            upload_speed=0,
+            num_active=0,
+            num_waiting=0,
+            num_stopped=0,
+        )
 
 
 @router.post("/speed-limit", status_code=status.HTTP_204_NO_CONTENT)

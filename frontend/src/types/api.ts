@@ -149,6 +149,18 @@ export interface PersonalRecord {
   last_watched_at?: string | null;
 }
 
+export interface PersonalWorkCatalogItem {
+  work_id: number;
+  title: string;
+  original_title?: string | null;
+  persian_title?: string | null;
+  release_year?: number | null;
+  poster_path?: string | null;
+  tmdb_rating?: number | null;
+  imdb_rating?: number | null;
+  personal?: PersonalRecord | null;
+}
+
 export interface LibraryItem {
   id: number;
   work_id: number;

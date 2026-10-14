@@ -162,8 +162,10 @@ class PersonalWorkCatalogItem(BaseModel):
     work_id: int
     title: str
     original_title: str | None = None
+    persian_title: str | None = None
     release_year: int | None = None
     poster_path: str | None = None
     tmdb_rating: float | None = None
     imdb_rating: float | None = None
     personal: PersonalRecordResponse | None = None
+
