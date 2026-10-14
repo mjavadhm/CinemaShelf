@@ -1,4 +1,5 @@
 """Verify isolated SQLite test fixture works without touching user data."""
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
