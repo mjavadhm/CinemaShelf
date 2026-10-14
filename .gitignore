@@ -58,3 +58,11 @@ htmlcov/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Frontend Node.js
+node_modules/
+frontend/dist/
+frontend/node_modules/
+*.tsbuildinfo
+
+
