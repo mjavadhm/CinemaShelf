@@ -1,13 +1,20 @@
-"""Application service and transaction orchestration for the library module."""
-
+import os
+from pathlib import Path
+import re
+import shutil
 from collections.abc import Sequence
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import ApplicationError
 from app.modules.library.models import LibraryItem, LibraryItemStatus, MediaFile
 from app.modules.library.repository import LibraryRepository
-from app.modules.library.schemas import LibraryItemCreate, MediaFileCreate
+from app.modules.library.schemas import (
+    LibraryItemCreate,
+    MediaFileCreate,
+    StorageVolumeResponse,
+)
 from app.modules.metadata.service import MetadataService
 
 
@@ -132,3 +139,92 @@ class LibraryService:
         item = self.get_item(item_id)
         self.repository.delete_item(item)
         self.session.commit()
+
+    def get_item_by_work_id(self, work_id: int) -> LibraryItem:
+        """Fetch LibraryItem by associated MediaWork ID or raise 404."""
+        item = self.repository.get_item_by_work_id(work_id)
+        if item is None:
+            raise ApplicationError(
+                code="item_not_found",
+                message=f"LibraryItem for work {work_id} not found",
+                status_code=404,
+            )
+        return item
+
+    def get_storage_volumes(self) -> list[StorageVolumeResponse]:
+        """Detect and return storage volumes status (online/offline, used, total space)."""
+        settings = get_settings()
+        detected_paths: dict[str, str] = {}
+
+        # 1. Configured local download directory
+        dl_path = str(settings.download_dir.resolve())
+        detected_paths[dl_path] = "Internal Storage (Downloads)"
+
+        # 2. Paths from LibraryItem roots
+        for root in self.repository.get_all_root_folders():
+            if root:
+                mount_pt, label = self._resolve_volume(root)
+                if mount_pt not in detected_paths:
+                    detected_paths[mount_pt] = label
+
+        # 3. Paths from registered MediaFiles
+        for media_file in self.repository.get_all_media_files():
+            if media_file.file_path:
+                mount_pt, label = self._resolve_volume(media_file.file_path)
+                if mount_pt not in detected_paths:
+                    detected_paths[mount_pt] = label
+
+        volumes: list[StorageVolumeResponse] = []
+        for mount_path, label in detected_paths.items():
+            vol_id = re.sub(r"[^a-zA-Z0-9_-]", "_", label.lower()).strip("_") or "vol"
+            is_online = os.path.exists(mount_path)
+            used_bytes = 0
+            total_bytes = 0
+            if is_online:
+                try:
+                    usage = shutil.disk_usage(mount_path)
+                    used_bytes = usage.used
+                    total_bytes = usage.total
+                except OSError:
+                    is_online = False
+            volumes.append(
+                StorageVolumeResponse(
+                    id=vol_id,
+                    label=label,
+                    mount_path=mount_path,
+                    used_bytes=used_bytes,
+                    total_bytes=total_bytes,
+                    is_online=is_online,
+                )
+            )
+
+        return volumes
+
+    @staticmethod
+    def _resolve_volume(path_str: str) -> tuple[str, str]:
+        """Extract mount directory and user-friendly drive label from a file/folder path."""
+        p = Path(path_str)
+        parts = p.parts
+        # Check /run/media/<user>/<label>
+        if len(parts) >= 5 and parts[1] == "run" and parts[2] == "media":
+            return str(Path(*parts[:5])), parts[4]
+        # Check /media/<user>/<label>
+        if len(parts) >= 4 and parts[1] == "media":
+            return str(Path(*parts[:4])), parts[3]
+        # Check /mnt/<label>
+        if len(parts) >= 3 and parts[1] == "mnt":
+            return str(Path(*parts[:3])), parts[2]
+
+        # If existing path, check real mount point
+        if os.path.exists(path_str):
+            cur = p.resolve()
+            while not os.path.ismount(cur) and cur.parent != cur:
+                cur = cur.parent
+            label = cur.name if cur.name else "Internal Storage"
+            return str(cur), label
+
+        # Non-existing path: use parent folder as label
+        parent = str(p.parent)
+        label = p.parent.name or "External Storage"
+        return parent, label
+

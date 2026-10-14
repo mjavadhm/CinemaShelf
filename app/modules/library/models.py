@@ -73,6 +73,12 @@ class LibraryItem(Base, TimestampMixin):
         cascade="all, delete-orphan",
     )
 
+    @property
+    def personal_record(self):
+        """Proxy to associated work's personal record if present."""
+        return getattr(self.work, "personal_record", None) if self.work else None
+
+
 
 class MediaFile(Base, TimestampMixin):
     """Physical video file residing on a storage source."""
@@ -117,3 +123,10 @@ class MediaFile(Base, TimestampMixin):
         back_populates="media_file",
         uselist=False,
     )
+
+    @property
+    def is_online(self) -> bool:
+        """Check whether physical file exists on accessible storage."""
+        import os
+        return os.path.exists(self.file_path)
+

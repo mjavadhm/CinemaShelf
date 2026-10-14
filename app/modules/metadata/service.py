@@ -21,6 +21,10 @@ from app.modules.metadata.models import (
     WorkType,
 )
 from app.modules.metadata.repository import MetadataRepository
+from app.modules.metadata.schemas import (
+    PersonCreditDetailResponse,
+    PersonDetailResponse,
+)
 
 
 class MetadataService:
@@ -202,3 +206,28 @@ class MetadataService:
             credit_type=credit_type,
             job=job,
         )
+
+    def get_person_details(self, person_id: int) -> PersonDetailResponse:
+        """Fetch Person and their categorized credits or raise 404."""
+        person = self.repository.get_person_by_id(person_id)
+        if person is None:
+            raise ApplicationError(
+                code="person_not_found",
+                message=f"Person {person_id} not found",
+                status_code=404,
+            )
+        credits = self.repository.get_person_credits(person_id)
+        cast_credits = [c for c in credits if c.credit_type == CreditType.CAST]
+        crew_credits = [c for c in credits if c.credit_type == CreditType.CREW]
+        return PersonDetailResponse(
+            id=person.id,
+            tmdb_person_id=person.tmdb_person_id,
+            name=person.name,
+            original_name=person.original_name,
+            persian_name=person.persian_name,
+            known_for_department=person.known_for_department,
+            profile_path=person.profile_path,
+            cast=[PersonCreditDetailResponse.model_validate(c) for c in cast_credits],
+            crew=[PersonCreditDetailResponse.model_validate(c) for c in crew_credits],
+        )
+

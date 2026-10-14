@@ -14,6 +14,7 @@ from app.modules.library.schemas import (
     LibraryItemSummaryResponse,
     MediaFileCreate,
     MediaFileResponse,
+    StorageVolumeResponse,
 )
 from app.modules.library.service import LibraryService
 
@@ -99,3 +100,22 @@ def remove_library_item(
     """Remove a library item entry from catalog."""
     service.remove_item(id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/by-work/{work_id}", response_model=LibraryItemDetailResponse)
+def get_library_item_by_work(
+    work_id: int,
+    service: Annotated[LibraryService, Depends(get_library_service)],
+) -> LibraryItemDetailResponse:
+    """Retrieve library item and files corresponding to a MediaWork ID."""
+    item = service.get_item_by_work_id(work_id)
+    return LibraryItemDetailResponse.model_validate(item)
+
+
+@router.get("/volumes", response_model=list[StorageVolumeResponse])
+def list_storage_volumes(
+    service: Annotated[LibraryService, Depends(get_library_service)],
+) -> list[StorageVolumeResponse]:
+    """Retrieve status, online availability, and disk usage for storage drives."""
+    return service.get_storage_volumes()
+

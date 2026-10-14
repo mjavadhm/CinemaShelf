@@ -42,8 +42,32 @@ class MediaFileResponse(BaseModel):
     subtitle_paths: list[str] | None = None
     has_soft_sub: bool = False
     is_missing: bool = False
+    is_online: bool = False
     last_verified_at: datetime | None = None
     created_at: datetime
+
+
+class StorageVolumeResponse(BaseModel):
+    """Storage drive/volume status schema."""
+
+    id: str
+    label: str
+    mount_path: str
+    used_bytes: int
+    total_bytes: int
+    is_online: bool
+
+
+class PersonalSummary(BaseModel):
+    """Compact personal status for library listings."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user_rating: float | None = None
+    in_watchlist: bool = False
+    is_favorite: bool = False
+    watch_status: str | None = None
+    last_watched_at: datetime | None = None
 
 
 class LibraryItemCreate(BaseModel):
@@ -75,6 +99,8 @@ class LibraryItemSummaryResponse(BaseModel):
     root_folder_path: str | None = None
     added_at: datetime
     work: MediaWorkSummaryResponse
+    media_files: list[MediaFileResponse] = Field(default_factory=list)
+    personal_record: PersonalSummary | None = None
 
 
 class LibraryItemDetailResponse(BaseModel):
@@ -89,3 +115,4 @@ class LibraryItemDetailResponse(BaseModel):
     added_at: datetime
     work: MediaWorkSummaryResponse
     media_files: list[MediaFileResponse] = Field(default_factory=list)
+    personal_record: PersonalSummary | None = None

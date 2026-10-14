@@ -98,6 +98,7 @@ class MediaWorkSummaryResponse(BaseModel):
     imdb_rating: float | None = None
     rotten_tomatoes_score: int | None = None
     metascore: int | None = None
+    genres: list[GenreResponse] = Field(default_factory=list)
 
 
 class MediaWorkDetailResponse(MediaWorkSummaryResponse):
@@ -110,9 +111,30 @@ class MediaWorkDetailResponse(MediaWorkSummaryResponse):
     imdb_votes: int | None = None
     last_synced_at: datetime | None = None
 
-    genres: list[GenreResponse] = Field(default_factory=list)
     credits: list[WorkCreditResponse] = Field(default_factory=list)
     seasons: list[MediaSeasonResponse] = Field(default_factory=list)
+
+
+class PersonCreditDetailResponse(BaseModel):
+    """Credit entry on person filmography."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    work_id: int
+    credit_type: CreditType
+    department: str
+    job: str
+    character_name: str | None = None
+    billing_order: int | None = None
+    work: MediaWorkSummaryResponse
+
+
+class PersonDetailResponse(PersonResponse):
+    """Detailed Person representation with categorized filmography."""
+
+    cast: list[PersonCreditDetailResponse] = Field(default_factory=list)
+    crew: list[PersonCreditDetailResponse] = Field(default_factory=list)
 
 
 class ExternalSearchResultResponse(BaseModel):

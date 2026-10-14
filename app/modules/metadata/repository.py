@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.modules.metadata.models import (
     CreditType,
@@ -165,3 +165,16 @@ class MetadataRepository:
             stmt = stmt.where(WorkCredit.job == job)
 
         return self.session.scalars(stmt).all()
+
+    def get_person_credits(self, person_id: int) -> Sequence[WorkCredit]:
+        """Fetch all work credits for a person with work and genres loaded."""
+        stmt = (
+            select(WorkCredit)
+            .where(WorkCredit.person_id == person_id)
+            .options(
+                joinedload(WorkCredit.work).selectinload(MediaWork.genres),
+            )
+            .order_by(WorkCredit.credit_type, WorkCredit.billing_order.nulls_last())
+        )
+        return self.session.scalars(stmt).all()
+

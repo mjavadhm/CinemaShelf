@@ -12,6 +12,7 @@ from app.modules.metadata.schemas import (
     IngestWorkRequest,
     MediaWorkDetailResponse,
     MediaWorkSummaryResponse,
+    PersonDetailResponse,
 )
 from app.modules.metadata.service import MetadataService
 
@@ -98,6 +99,15 @@ def get_work_details(
     return MediaWorkDetailResponse.model_validate(work)
 
 
+@router.get("/people/{id}", response_model=PersonDetailResponse)
+def get_person(
+    id: int,
+    service: Annotated[MetadataService, Depends(get_metadata_service)],
+) -> PersonDetailResponse:
+    """Fetch complete biographical details and categorized filmography of a person."""
+    return service.get_person_details(id)
+
+
 @router.get("/people/{id}/filmography", response_model=list[MediaWorkSummaryResponse])
 def get_person_filmography(
     id: int,
@@ -110,3 +120,4 @@ def get_person_filmography(
         person_id=id, credit_type=credit_type, job=job
     )
     return [MediaWorkSummaryResponse.model_validate(w) for w in works]
+

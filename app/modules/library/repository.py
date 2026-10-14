@@ -47,13 +47,29 @@ class LibraryRepository:
         """List library items with optional status filtering."""
         stmt = (
             select(LibraryItem)
-            .options(joinedload(LibraryItem.work))
+            .options(
+                joinedload(LibraryItem.work),
+                selectinload(LibraryItem.media_files),
+            )
             .order_by(LibraryItem.added_at.desc())
         )
         if status:
             stmt = stmt.where(LibraryItem.status == status)
 
         stmt = stmt.limit(limit).offset(offset)
+        return self.session.scalars(stmt).all()
+
+    def get_all_media_files(self) -> Sequence[MediaFile]:
+        """Fetch all registered media files across all items."""
+        return self.session.scalars(select(MediaFile)).all()
+
+    def get_all_root_folders(self) -> Sequence[str]:
+        """Fetch distinct non-null root folder paths."""
+        stmt = (
+            select(LibraryItem.root_folder_path)
+            .where(LibraryItem.root_folder_path.is_not(None))
+            .distinct()
+        )
         return self.session.scalars(stmt).all()
 
     def create_item(self, item: LibraryItem) -> LibraryItem:
