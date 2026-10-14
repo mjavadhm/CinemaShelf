@@ -15,7 +15,7 @@ dependencies = [
     "alembic>=1.13.1",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.2.1",
-    "httpx>=0.27.0",
+    "httpx[socks]>=0.27.0",
 ]
 
 [project.optional-dependencies]

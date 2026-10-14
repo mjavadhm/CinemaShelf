@@ -21,8 +21,26 @@ def load_all_models() -> None:
     configure_mappers()
 
 
+def normalize_proxy_env() -> None:
+    """Normalize SOCKS proxy schemes in environment variables for httpx compatibility."""
+    import os
+
+    for key in (
+        "ALL_PROXY",
+        "all_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+        "HTTPS_PROXY",
+        "https_proxy",
+    ):
+        val = os.environ.get(key)
+        if val and val.startswith("socks://"):
+            os.environ[key] = "socks5://" + val[len("socks://") :]
+
+
 def startup_app(settings: Settings) -> None:
     """Initialize required local directories, logging, and background runners."""
+    normalize_proxy_env()
     settings.ensure_directories()
     configure_logging(settings)
     load_all_models()

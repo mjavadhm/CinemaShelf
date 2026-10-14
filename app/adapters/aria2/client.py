@@ -143,7 +143,7 @@ class Aria2Client:
     def _get_client(self) -> httpx.Client:
         if self._http_client is not None:
             return self._http_client
-        return httpx.Client(timeout=10.0)
+        return httpx.Client(timeout=10.0, trust_env=False)
 
     def _build_payload(self, method: str, params: list[Any]) -> dict[str, Any]:
         full_params: list[Any] = []

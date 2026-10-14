@@ -164,6 +164,19 @@ class MetadataProvidersClient:
     def _get_client(self) -> httpx.AsyncClient:
         if self._http_client is not None:
             return self._http_client
+        import os
+
+        for key in (
+            "ALL_PROXY",
+            "all_proxy",
+            "HTTP_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+        ):
+            val = os.environ.get(key)
+            if val and val.startswith("socks://"):
+                os.environ[key] = "socks5://" + val[len("socks://") :]
         return httpx.AsyncClient(timeout=15.0)
 
     def _parse_date(self, date_str: str | None) -> date | None:
