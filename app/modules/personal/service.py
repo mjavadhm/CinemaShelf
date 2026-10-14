@@ -1,4 +1,5 @@
 """Application service and transaction orchestration for the personal module."""
+
 from sqlalchemy.orm import Session
 
 

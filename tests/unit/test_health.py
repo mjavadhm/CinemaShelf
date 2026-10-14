@@ -1,4 +1,5 @@
 """Smoke test for basic application setup."""
+
 from app.core.config import Settings
 
 

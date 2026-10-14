@@ -1,4 +1,5 @@
 """Ensure no module inside app/ imports from the temporary legacy/ directory."""
+
 from pathlib import Path
 
 

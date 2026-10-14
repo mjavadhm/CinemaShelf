@@ -1,6 +1,7 @@
 """FastAPI application entry point for CinemaShelf."""
+
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -8,6 +9,9 @@ from fastapi.responses import JSONResponse
 from app.bootstrap import shutdown_app, startup_app
 from app.core.config import get_settings
 from app.core.errors import ApplicationError
+from app.modules.library.router import router as library_router
+from app.modules.metadata.router import router as metadata_router
+from app.modules.sources.router import router as sources_router
 
 
 @asynccontextmanager
@@ -47,6 +51,10 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["system"])
     async def health_check() -> dict[str, str]:
         return {"status": "ok", "environment": settings.app_env}
+
+    app.include_router(metadata_router)
+    app.include_router(library_router)
+    app.include_router(sources_router)
 
     return app
 

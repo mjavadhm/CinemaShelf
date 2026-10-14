@@ -1,4 +1,5 @@
 """Centralized application settings management."""
+
 from functools import lru_cache
 from pathlib import Path
 
@@ -26,6 +27,20 @@ class Settings(BaseSettings):
     omdb_api_key: str = ""
     tmdb_api_key: str = ""
 
+    # Zarfilm & Download Settings
+    zarfilm_base_url: str = "https://zarfilm.com"
+    download_dir: Path = Path("./data/downloads")
+    preferred_quality: str = "1080p"
+    prefer_x265: bool = True
+    max_concurrent_downloads: int = 2
+
+    # Night Scheduler Settings
+    scheduler_enabled: bool = True
+    scheduler_start_hour: int = 2
+    scheduler_end_hour: int = 7
+    scheduler_force_run: bool = False
+    scheduler_poll_interval_seconds: int = 5
+
     llm_enabled: bool = False
     llm_provider: str = ""
     llm_api_key: str = ""
@@ -44,6 +59,7 @@ class Settings(BaseSettings):
             self.log_dir,
             self.zarfilm_profile_dir,
             self.letterboxd_profile_dir,
+            self.download_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)
 

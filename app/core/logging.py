@@ -1,4 +1,5 @@
 """Centralized standard logging configuration."""
+
 import logging
 from logging.handlers import RotatingFileHandler
 

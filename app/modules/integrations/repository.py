@@ -1,4 +1,5 @@
 """Persistence queries for the integrations module (no internal commits)."""
+
 from sqlalchemy.orm import Session
 
 

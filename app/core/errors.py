@@ -28,7 +28,9 @@ class FileMissingError(ApplicationError):
 class MatchAmbiguousError(ApplicationError):
     """Raised when movie identification produces multiple uncertain matches."""
 
-    def __init__(self, message: str = "تطبیق فیلم مبهم است و نیاز به انتخاب دستی دارد") -> None:
+    def __init__(
+        self, message: str = "تطبیق فیلم مبهم است و نیاز به انتخاب دستی دارد"
+    ) -> None:
         super().__init__(code="match_ambiguous", message=message, status_code=409)
 
 
