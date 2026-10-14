@@ -1,19 +1,17 @@
-# Implementation Plan - Phase 5: Letterboxd Integrations & Sync
+# Implementation Plan - Phase 5: Letterboxd File Import & Sync
 
-This plan defines the architecture, schema contracts, application services, and API endpoints for **Phase 5** of CinemaShelf, based on [`docs/11-implementation-roadmap-fa.md`](../11-implementation-roadmap-fa.md), [`docs/05-workflows-and-jobs.md`](../05-workflows-and-jobs.md), and [`docs/decisions/0002-domain-invariants.md`](../decisions/0002-domain-invariants.md).
+This plan defines the architecture, schema contracts, application services, and API endpoints for **Phase 5** of CinemaShelf, scoped specifically to **file-based imports** (excluding live web scraping), based on [`docs/11-implementation-roadmap-fa.md`](../11-implementation-roadmap-fa.md), [`docs/05-workflows-and-jobs.md`](../05-workflows-and-jobs.md), and [`docs/decisions/0002-domain-invariants.md`](../decisions/0002-domain-invariants.md).
 
 ---
 
 ## Goal Description
 
-Transform CinemaShelf into an interconnected cinephile hub by integrating with **Letterboxd**:
-1. **Multi-Source Letterboxd Import**:
-   - **Full ZIP Export**: Parse full Letterboxd data export ZIP archives containing `watchlist.csv`, `watched.csv`, `ratings.csv`, `diary.csv`, and `lists/*.csv`.
-   - **Individual CSV Upload**: Import standalone CSVs (standard Letterboxd exports and legacy simplified `Name,Year` format).
-   - **Public RSS Feed Sync**: Fetch and parse official Letterboxd user RSS feeds (`https://letterboxd.com/{username}/rss/`) extracting structured diary events, watched films, and ratings.
-   - **Watchlist Web/Browser Extraction**: Scrape public watchlists (`https://letterboxd.com/{username}/watchlist/`) with anti-bot protection support via persistent Chrome profile session (`data/profiles/letterboxd`).
+Enable robust, offline-friendly import and synchronization of Letterboxd archives from user-supplied files:
+1. **Multi-Format File Import**:
+   - **Full ZIP Export**: Ingest complete Letterboxd export packages containing `watchlist.csv`, `watched.csv`, `ratings.csv`, `diary.csv`, and any custom list CSVs under `lists/`.
+   - **Standalone CSV Files**: Ingest individual files such as `watchlist.csv`, `watched.csv`, `ratings.csv`, `diary.csv`, or simplified legacy CSVs (`Name,Year`).
 2. **Catalog & Identity Resolution**:
-   - Match external Letterboxd titles and URIs to internal `MediaWork` entities:
+   - Map external Letterboxd titles and URIs to internal `MediaWork` entities:
      1. Cached `ExternalItemMapping` lookup (`provider="LETTERBOXD"`, `external_key=uri`).
      2. Local catalog search by normalized title + release year.
      3. External TMDB search and automated ingestion via `MetadataService.get_or_ingest_work` (with graceful offline fallback).
@@ -25,18 +23,21 @@ Transform CinemaShelf into an interconnected cinephile hub by integrating with *
 4. **Auditability & Observability**:
    - Persist execution runs in `IntegrationSyncRun` with counts (`items_processed`, `items_created`, `items_updated`, `items_failed`), execution timing, and structured error logs.
 
+> [!NOTE]
+> Web scraping and live browser sessions have been excluded from this phase per user request. Letterboxd data is ingested exclusively via user export ZIP packages and CSV files.
+
 ---
 
 ## User Review Required
 
 > [!IMPORTANT]
 > **Conflict Resolution Policy**:
-> When a movie already has local personal data (e.g., user rated it 9.0 locally, but Letterboxd has 4.0/5.0), the default policy is `PRESERVE_LOCAL`. The user can optionally pass `conflict_policy="OVERWRITE_LOCAL"` in the API request if they explicitly intend to sync Letterboxd over local changes.
+> When a movie already has local personal data (e.g., user rated it 9.0 locally, but Letterboxd has 4.0/5.0), the default policy is `PRESERVE_LOCAL`. The user can optionally pass `conflict_policy="OVERWRITE_LOCAL"` in the upload request if they explicitly intend to overwrite local changes.
 
 > [!NOTE]
 > **Rating Scale Conversion**:
-> Letterboxd uses a 5-star scale in 0.5 increments (0.5 to 5.0). CinemaShelf's database supports ratings from 0.0 to 10.0.
-> We support a parameter `scale_mode`:
+> Letterboxd uses a 5-star scale in 0.5 increments (0.5 to 5.0). CinemaShelf supports ratings from 0.0 to 10.0.
+> The parameter `scale_mode` supports:
 > - `"raw"` (default): Preserves the exact Letterboxd float (e.g. 4.5).
 > - `"ten_point"`: Automatically doubles the rating to normalize to a 10-point scale (e.g. 4.5 -> 9.0).
 
@@ -44,7 +45,7 @@ Transform CinemaShelf into an interconnected cinephile hub by integrating with *
 
 ## Open Questions
 
-None currently blocking. Both `PRESERVE_LOCAL` and `OVERWRITE_LOCAL`, as well as `raw` and `ten_point` scale modes, are made configurable at the request level with safe, non-destructive defaults.
+None. All decisions regarding scope (file-only), conflict policy (`PRESERVE_LOCAL` default), and rating scale (`raw` default) are established.
 
 ---
 
@@ -65,7 +66,7 @@ sequenceDiagram
     %% CSV / ZIP Import Flow
     User->>Router: POST /integrations/letterboxd/import-file (multipart: .csv or .zip)
     Router->>Service: import_file(bytes, filename, conflict_policy, scale_mode)
-    Service->>Repo: create_sync_run(LETTERBOXD, sync_type="IMPORT_FILE")
+    Service->>Repo: create_sync_run(LETTERBOXD, sync_type="FILE_IMPORT")
     Service->>Adapter: parse_zip_export() or parse_csv()
     Adapter-->>Service: list[LetterboxdItem]
 
@@ -85,15 +86,6 @@ sequenceDiagram
 
     Service->>Repo: finish_sync_run(run_id, SUCCESS, counts...)
     Router-->>User: SyncRunResponse(status="SUCCESS", items_processed=...)
-
-    %% Background RSS Sync
-    Note over Service,Adapter: Scheduled or manual RSS feed update
-    User->>Router: POST /integrations/letterboxd/sync-rss {"username": "filmlover"}
-    Router->>Service: sync_user_rss("filmlover")
-    Service->>Adapter: fetch_user_rss("filmlover")
-    Adapter-->>Service: list[LetterboxdItem]
-    Service->>PersService: apply updates (diary, ratings, watched)
-    Router-->>User: SyncRunResponse(...)
 ```
 
 ---
@@ -102,22 +94,12 @@ sequenceDiagram
 
 Grouped by component layer in dependency order:
 
-### 1. Central Configuration (`app/core/config.py`)
-
-#### [MODIFY] [`app/core/config.py`](../../app/core/config.py)
-- Add settings for Letterboxd automated background sync:
-  - `letterboxd_username: str = ""`
-  - `letterboxd_sync_interval_hours: int = 12`
-  - `letterboxd_auto_sync_enabled: bool = False`
-
----
-
-### 2. Letterboxd External Adapter (`app/adapters/letterboxd/`)
+### 1. Letterboxd External Adapter (`app/adapters/letterboxd/`)
 
 #### [MODIFY] [`app/adapters/letterboxd/client.py`](../../app/adapters/letterboxd/client.py)
 Implement `LetterboxdClient` complying with `LetterboxdPort`:
 - **Models & Dataclasses**:
-  - `LetterboxdItemType`: `WATCHLIST`, `WATCHED`, `RATING`, `DIARY`, `LIST`.
+  - `LetterboxdItemType(str, Enum)`: `WATCHLIST`, `WATCHED`, `RATING`, `DIARY`, `LIST`.
   - `LetterboxdItem`:
     ```python
     @dataclass
@@ -145,21 +127,21 @@ Implement `LetterboxdClient` complying with `LetterboxdPort`:
         diary: list[LetterboxdItem] = field(default_factory=list)
         lists: dict[str, list[LetterboxdItem]] = field(default_factory=dict)
     ```
+- **Port Protocol**:
+  ```python
+  class LetterboxdPort(Protocol):
+      def parse_csv(self, content: str | bytes, filename: str | None = None) -> list[LetterboxdItem]: ...
+      def parse_zip_export(self, zip_bytes: bytes) -> LetterboxdExportArchive: ...
+  ```
 - **Methods**:
   - `parse_csv(content: str | bytes, filename: str | None = None) -> list[LetterboxdItem]`:
     Robust CSV parser with flexible header matching (detects `Name`/`Title`/`Film`, `Year`, `Letterboxd URI`/`URL`, `Rating`, `Watched Date`/`Date`, `Rewatch`, `Tags`, `Description`). Handles standard Letterboxd CSV formats (`watchlist.csv`, `watched.csv`, `ratings.csv`, `diary.csv`, custom list CSVs) and simplified legacy CSVs (`Name,Year`).
   - `parse_zip_export(zip_bytes: bytes) -> LetterboxdExportArchive`:
     Inspects archive structure in-memory using `zipfile.ZipFile`, extracting and parsing all standard CSV files and any custom lists under `lists/`.
-  - `fetch_user_rss(username: str) -> list[LetterboxdItem]`:
-    Fetches `https://letterboxd.com/{username}/rss/` using `httpx.Client` and parses XML with `xml.etree.ElementTree`. Extracts standard elements and custom `letterboxd:*` XML namespaces (`letterboxd:filmTitle`, `letterboxd:filmYear`, `letterboxd:memberRating`, `letterboxd:watchedDate`, `letterboxd:rewatch`).
-  - `scrape_watchlist_page(username: str, page: int = 1) -> tuple[list[LetterboxdItem], bool]`:
-    Fetches public watchlist HTML; parses poster elements (`data-film-slug`, `data-target-link`, image titles, years) with pagination detection.
-  - `launch_browser_session() -> None`:
-    Launches Chrome with `letterboxd_profile_dir` using `DrissionPage` for manual user login or CAPTCHA solving.
 
 ---
 
-### 3. Integrations Contracts & Persistence Layer (`app/modules/integrations/`)
+### 2. Integrations Contracts & Persistence Layer (`app/modules/integrations/`)
 
 #### [MODIFY] [`app/modules/integrations/schemas.py`](../../app/modules/integrations/schemas.py)
 Define API request/response DTOs:
@@ -171,39 +153,30 @@ Define API request/response DTOs:
   - `started_at: datetime`, `finished_at: datetime | None`, `error_details: dict[str, Any] | None`
 - `ExternalItemMappingResponse`:
   - `id: int`, `provider: IntegrationProvider`, `external_key: str`, `work_id: int`, `last_synced_at: datetime`
-- `LetterboxdSyncRequest`:
-  - `username: str = Field(min_length=1, max_length=100)`
-  - `conflict_policy: ConflictPolicy = ConflictPolicy.PRESERVE_LOCAL`
-  - `scale_mode: RatingScaleMode = RatingScaleMode.RAW`
-  - `max_pages: int = Field(default=5, ge=1, le=50)`
-- `ImportSummaryResponse`:
-  - Summary of the import batch: sync run status, processed count, created count, updated count, failed count, error list.
+- `SyncRunFilterParams`:
+  - Optional `provider: IntegrationProvider | None`, `status: SyncRunStatus | None`, `limit: int = 20`, `offset: int = 0`.
 
 #### [MODIFY] [`app/modules/integrations/repository.py`](../../app/modules/integrations/repository.py)
 Implement `IntegrationsRepository` (strictly persistence, no `session.commit()`):
 - `create_sync_run(provider: IntegrationProvider, sync_type: str) -> IntegrationSyncRun`
 - `finish_sync_run(run_id: int, status: SyncRunStatus, items_processed: int, items_created: int, items_updated: int, items_failed: int, error_details: dict[str, Any] | None = None) -> IntegrationSyncRun`
 - `get_sync_run(run_id: int) -> IntegrationSyncRun | None`
-- `list_sync_runs(provider: IntegrationProvider | None = None, limit: int = 20, offset: int = 0) -> list[IntegrationSyncRun]`
+- `list_sync_runs(provider: IntegrationProvider | None = None, status: SyncRunStatus | None = None, limit: int = 20, offset: int = 0) -> list[IntegrationSyncRun]`
 - `get_external_mapping(provider: IntegrationProvider, external_key: str) -> ExternalItemMapping | None`
 - `save_external_mapping(mapping: ExternalItemMapping) -> ExternalItemMapping`
-- `list_mappings_by_work_id(work_id: int) -> list[ExternalItemMapping]`
+- `list_mappings(provider: IntegrationProvider | None = None, limit: int = 50, offset: int = 0) -> list[ExternalItemMapping]`
 - `find_work_by_title_year(title: str, year: int | None = None) -> MediaWork | None`
 
 ---
 
-### 4. Integrations Application Service Layer (`app/modules/integrations/service.py`)
+### 3. Integrations Application Service Layer (`app/modules/integrations/service.py`)
 
 #### [MODIFY] [`app/modules/integrations/service.py`](../../app/modules/integrations/service.py)
 Implement `IntegrationsService` coordinating transaction boundaries, matching, and invariant enforcement:
 - `__init__(session: Session, letterboxd_client: LetterboxdPort | None = None, metadata_service: MetadataService | None = None, personal_service: PersonalService | None = None)`
 - **Methods**:
-  - `import_file(file_bytes: bytes, filename: str, conflict_policy: ConflictPolicy, scale_mode: RatingScaleMode) -> IntegrationSyncRun`:
+  - `import_file(file_bytes: bytes, filename: str, conflict_policy: ConflictPolicy, scale_mode: RatingScaleMode) -> SyncRunResponse`:
     Dispatches to ZIP extractor if `.zip`, or CSV parser if `.csv`.
-  - `sync_rss(username: str, conflict_policy: ConflictPolicy, scale_mode: RatingScaleMode) -> IntegrationSyncRun`:
-    Fetches RSS and applies updates.
-  - `sync_watchlist(username: str, max_pages: int, conflict_policy: ConflictPolicy, scale_mode: RatingScaleMode) -> IntegrationSyncRun`:
-    Fetches public watchlist pages and applies updates.
   - `_resolve_media_work(item: LetterboxdItem) -> MediaWork | None`:
     1. Check `ExternalItemMapping` for `(LETTERBOXD, item.letterboxd_uri)`.
     2. Search local DB by title & year.
@@ -220,29 +193,14 @@ Implement `IntegrationsService` coordinating transaction boundaries, matching, a
 
 ---
 
-### 5. Background Job Handler & Runner Integration (`app/jobs/`)
-
-#### [MODIFY] [`app/jobs/handlers.py`](../../app/jobs/handlers.py)
-- Add `sync_letterboxd_feed(session: Session, username: str, conflict_policy: str = "PRESERVE_LOCAL") -> int`:
-  Handler to run periodic background updates of user's Letterboxd RSS feed and ingest new diary entries.
-
-#### [MODIFY] [`app/jobs/runner.py`](../../app/jobs/runner.py)
-- In `BackgroundJobRunner._run_loop`:
-  If `settings.letterboxd_auto_sync_enabled` and `settings.letterboxd_username`, invoke `sync_letterboxd_feed` periodically based on `settings.letterboxd_sync_interval_hours`.
-
----
-
-### 6. HTTP API Router & App Wiring (`app/modules/integrations/router.py` & `app/main.py`)
+### 4. HTTP API Router & App Wiring (`app/modules/integrations/router.py` & `app/main.py`)
 
 #### [MODIFY] [`app/modules/integrations/router.py`](../../app/modules/integrations/router.py)
 Expose HTTP endpoints:
-- `POST /integrations/letterboxd/import-file`: Multipart file upload for CSV or ZIP.
-- `POST /integrations/letterboxd/sync-rss`: Trigger RSS feed synchronization.
-- `POST /integrations/letterboxd/sync-watchlist`: Trigger online watchlist synchronization.
+- `POST /integrations/letterboxd/import-file`: Multipart file upload for CSV or ZIP archive.
 - `GET /integrations/sync-runs`: List past sync runs with pagination (`status`, `provider` filters).
 - `GET /integrations/sync-runs/{run_id}`: Retrieve detailed sync run audit report.
 - `GET /integrations/mappings`: List external item mappings.
-- `POST /integrations/letterboxd/browser-session`: Launch Chrome browser session for Letterboxd.
 
 #### [MODIFY] [`app/main.py`](../../app/main.py)
 - Include `integrations_router`: `app.include_router(integrations_router)`.
@@ -256,8 +214,7 @@ Expose HTTP endpoints:
    - `tests/unit/test_letterboxd_adapter.py`:
      - Test CSV parsing of `watchlist.csv`, `watched.csv`, `ratings.csv`, `diary.csv`, and legacy `Name,Year` CSVs.
      - Test ZIP archive extraction and multi-CSV parsing.
-     - Test RSS feed XML parsing with mock XML data.
-     - Test error cases (malformed CSV, invalid XML, missing columns).
+     - Test error cases (malformed CSV, missing columns, empty files).
    - `tests/unit/test_integrations_service.py`:
      - Test matching against existing `MediaWork`.
      - Test external provider ingestion fallback.
@@ -270,18 +227,17 @@ Expose HTTP endpoints:
    - `tests/integration/test_api_phase5.py`:
      - Test `POST /integrations/letterboxd/import-file` with mock CSV file.
      - Test `POST /integrations/letterboxd/import-file` with mock ZIP export.
-     - Test `POST /integrations/letterboxd/sync-rss` with mock HTTP response.
      - Test `GET /integrations/sync-runs` and `GET /integrations/sync-runs/{id}`.
      - Test `GET /integrations/mappings`.
 3. **Architecture & Linting**:
    - `tests/architecture/test_no_legacy_imports.py` (ensure 0 imports from `legacy/`).
-   - Run `/home/javadhm/venv/bin/pytest` (all 72+ tests pass).
+   - Run `/home/javadhm/venv/bin/pytest` (all existing + new tests pass).
    - Run `/home/javadhm/venv/bin/ruff check .` (all clean).
    - Run `/home/javadhm/venv/bin/ruff format --check .` (clean formatting).
    - Run `/home/javadhm/venv/bin/mypy app tests` (0 type issues).
 
 ### Manual Verification
-- Test importing `legacy/zarfilm-downloader/data/watchlist.csv` via the API endpoint.
+- Test importing `legacy/zarfilm-downloader/data/watchlist.csv` via the upload API endpoint.
 - Verify that movies are added to `MediaWork`, given `LibraryItem` with `status=WANTED`, and marked `in_watchlist=True` in `PersonalRecord`.
 - Verify database migration compatibility on `cinemashelf.db`.
 - Verify full app startup and shutdown lifecycle via `startup_app()` and `shutdown_app()`.
