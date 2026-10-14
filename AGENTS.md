@@ -85,7 +85,13 @@ Always follow `docs/08-adding-a-feature.md` and verify against `templates/review
 5. Implement use-case orchestration and transaction commit/rollback in `service.py`.
 6. Expose HTTP endpoints in `router.py` and register in `app/main.py`.
 7. Write unit and integration tests in `tests/` (never require live internet or real user media drives in tests).
-8. Document implementation plans and walkthroughs in `docs/progress/`.
+8. **Mandatory Real-World Smoke Testing**:
+   - Automated tests with mocks or in-memory SQLite in `pytest` are necessary but not sufficient.
+   - Whenever technically feasible and safe, **test features in the real environment**:
+     - Verify database migrations on the real local SQLite database (`alembic upgrade head`).
+     - Verify real application startup and shutdown lifecycle (`startup_app(settings)` and `shutdown_app()`), confirming that all SQLAlchemy mappers resolve cleanly and the background job runner loops without runtime errors.
+     - Execute real smoke requests against the FastAPI app or local endpoints to verify end-to-end wiring.
+9. Document implementation plans and walkthroughs in `docs/progress/`.
 
 ---
 
