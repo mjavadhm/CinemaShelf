@@ -2,6 +2,7 @@
 
 import logging
 import os
+import platform
 import shutil
 import subprocess
 import time
@@ -216,13 +217,20 @@ class Aria2Client:
             "--max-connection-per-server=8",
             "--continue=true",
             f"--dir={dl_dir}",
-            "--daemon=true",
         ]
+        if platform.system() != "Windows":
+            cmd.append("--daemon=true")
+
         if self.settings.aria2_rpc_secret:
             cmd.append(f"--rpc-secret={self.settings.aria2_rpc_secret}")
 
+        popen_kwargs: dict[str, Any] = {}
+        if platform.system() == "Windows":
+            # On Windows, suppress the console window popup
+            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+
         try:
-            subprocess.Popen(cmd)
+            subprocess.Popen(cmd, **popen_kwargs)
             for _ in range(6):
                 time.sleep(0.5)
                 if self.is_daemon_running():

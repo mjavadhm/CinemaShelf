@@ -228,18 +228,19 @@ class LibraryService:
                 is_ext = any(
                     mp_str.startswith(prefix)
                     for prefix in ["/run/media", "/media", "/mnt", "/Volumes"]
-                )
+                ) or ("removable" in getattr(p, "opts", "").lower())
 
+                drive_name = mp.name if mp.name else (p.device or mp_str).rstrip("\\/")
                 if is_ext:
-                    label = f"هارد اکسترنال ({mp.name})"
-                elif mp_str == "/":
-                    label = "دیسک سیستم (/)"
+                    label = f"هارد اکسترنال ({drive_name})"
+                elif mp_str in ("/", "C:\\", "c:\\", "C:", "c:"):
+                    label = f"دیسک سیستم ({drive_name})"
                 elif mp_str == "/home":
                     label = "پارتیشن کاربری (/home)"
                 else:
-                    label = mp.name or mp_str
+                    label = f"درایو ({drive_name})" if (p.device and ":" in p.device) else (mp.name or mp_str)
 
-                drive_id = re.sub(r"[^a-zA-Z0-9_-]", "_", mp.name.lower()).strip("_") or f"drive_{len(drives)}"
+                drive_id = re.sub(r"[^a-zA-Z0-9_-]", "_", drive_name.lower()).strip("_") or f"drive_{len(drives)}"
 
                 drives.append(
                     StorageDriveShortcut(
@@ -370,6 +371,11 @@ class LibraryService:
                 cur = cur.parent
             label = cur.name if cur.name else ("دیسک سیستم" if str(cur) == "/" else str(cur))
             return str(cur), label
+
+        # Check Windows drive letter if disconnected (e.g. "D:\Movies\film.mkv" -> "D:\")
+        if p.drive and len(p.drive) >= 2 and p.drive[1] == ":":
+            drive_root = p.drive + "\\"
+            return drive_root, f"درایو ({p.drive})"
 
         # Non-existing path: do not invent phantom offline volumes for temporary or test paths
         return None
