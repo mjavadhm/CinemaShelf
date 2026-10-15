@@ -109,12 +109,34 @@ class LibraryService:
         self,
         status: LibraryItemStatus | None = None,
         library_id: int | None = None,
+        search: str | None = None,
+        genre: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> Sequence[LibraryItem]:
         """List library items with filtering."""
         return self.repository.list_items(
-            status=status, library_id=library_id, limit=limit, offset=offset
+            status=status,
+            library_id=library_id,
+            search=search,
+            genre=genre,
+            limit=limit,
+            offset=offset,
+        )
+
+    def count_items(
+        self,
+        status: LibraryItemStatus | None = None,
+        library_id: int | None = None,
+        search: str | None = None,
+        genre: str | None = None,
+    ) -> int:
+        """Count total library items matching query filters."""
+        return self.repository.count_items(
+            status=status,
+            library_id=library_id,
+            search=search,
+            genre=genre,
         )
 
     def update_status(self, item_id: int, status: LibraryItemStatus) -> LibraryItem:

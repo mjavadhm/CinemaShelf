@@ -1,11 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, HardDrive, Filter, Plus, BookmarkCheck, Film, Loader2, FolderOpen } from 'lucide-react';
+import { Star, HardDrive, Filter, Plus, BookmarkCheck, Film, Loader2, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLibraryItems } from '../hooks/useLibraryItems';
 import { useLibraries } from '../hooks/useLibraries';
 import { getTmdbImageUrl, LibraryItem } from '../types/api';
 import { AddWorkModal } from '../components/AddWorkModal';
 import { ManageLibrariesModal } from '../components/ManageLibrariesModal';
+
+function getPageRange(current: number, total: number): number[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages: number[] = [1];
+  if (current > 3) pages.push(-1);
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let i = start; i <= end; i++) {
+    pages.push(i);
+  }
+  if (current < total - 2) pages.push(-1);
+  pages.push(total);
+  return pages;
+}
 
 function getBestResolution(item: LibraryItem): string {
   const files = item.media_files || [];
@@ -35,8 +51,15 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
   const [resolutionFilter, setResolutionFilter] = useState<string>('ALL');
   const [onlineOnly, setOnlineOnly] = useState<boolean>(false);
   const [selectedGenre, setSelectedGenre] = useState<string>('ALL');
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(48);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isManageLibrariesOpen, setIsManageLibrariesOpen] = useState(false);
+
+  // Reset to page 1 on search or filter change
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, selectedLibraryId, selectedGenre, resolutionFilter, onlineOnly, pageSize]);
 
   const { libraries } = useLibraries();
 
@@ -45,6 +68,8 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
     allItems,
     allGenres,
     totalCount,
+    totalPages,
+    currentPage,
     isLoading,
     isError,
     error,
@@ -54,6 +79,8 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
     genre: selectedGenre,
     resolution: resolutionFilter,
     onlineOnly,
+    page,
+    pageSize,
   });
 
   return (
@@ -311,6 +338,81 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
               </Link>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination Bar */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-shelf-card border border-shelf-border rounded-xl">
+          <div className="text-xs text-slate-400">
+            صفحه <span className="text-white font-bold">{page}</span> از <span className="text-white font-bold">{totalPages}</span> (نمایش {(page - 1) * pageSize + 1} تا {Math.min(page * pageSize, totalCount)} از {totalCount} اثر)
+          </div>
+
+          <div className="flex items-center gap-1.5" dir="ltr">
+            <button
+              onClick={() => {
+                setPage((p) => Math.max(1, p - 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              disabled={page <= 1}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-shelf-border bg-slate-800 text-xs text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>قبلی</span>
+            </button>
+
+            {getPageRange(page, totalPages).map((p, idx) =>
+              p === -1 ? (
+                <span key={`dots-${idx}`} className="px-1.5 text-slate-500 text-xs font-mono">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setPage(p);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className={`min-w-[32px] h-8 rounded-lg text-xs font-bold transition border ${
+                    page === p
+                      ? 'bg-shelf-amber text-black border-shelf-amber shadow-sm'
+                      : 'bg-slate-900/60 text-slate-300 border-shelf-border hover:bg-slate-800'
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+
+            <button
+              onClick={() => {
+                setPage((p) => Math.min(totalPages, p + 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              disabled={page >= totalPages}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-shelf-border bg-slate-800 text-xs text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition"
+            >
+              <span>بعدی</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <span>تعداد در صفحه:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              className="bg-slate-900 border border-shelf-border text-white rounded-lg px-2.5 py-1 text-xs outline-none focus:border-shelf-amber"
+            >
+              <option value={24}>۲۴ اثر</option>
+              <option value={48}>۴۸ اثر</option>
+              <option value={96}>۹۶ اثر</option>
+              <option value={500}>همه اثرها</option>
+            </select>
+          </div>
         </div>
       )}
 

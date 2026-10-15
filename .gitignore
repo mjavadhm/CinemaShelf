@@ -65,4 +65,5 @@ frontend/dist/
 frontend/node_modules/
 *.tsbuildinfo
 
-
+# Local Scraped & Temporary HTML Dumps
+for scraping/

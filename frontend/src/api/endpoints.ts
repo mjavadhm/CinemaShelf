@@ -35,16 +35,38 @@ import {
 // Library & Storage Volumes
 // -----------------------------------------------------------------------------
 
+export interface PaginatedLibraryResult {
+  items: LibraryItem[];
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+}
+
 export async function getLibraryItems(params?: {
   status?: string;
   library_id?: number;
+  search?: string;
+  genre?: string;
   limit?: number;
   offset?: number;
-}): Promise<LibraryItem[]> {
+  page?: number;
+}): Promise<PaginatedLibraryResult> {
   const response = await apiClient.get<LibraryItem[]>('/library/items', {
     params,
   });
-  return response.data;
+  const totalCount = parseInt(response.headers['x-total-count'] || '0', 10) || response.data.length;
+  const totalPages = parseInt(response.headers['x-total-pages'] || '1', 10) || 1;
+  const currentPage = parseInt(response.headers['x-current-page'] || '1', 10) || 1;
+  const pageSize = parseInt(response.headers['x-page-size'] || '50', 10) || response.data.length;
+
+  return {
+    items: response.data,
+    totalCount,
+    totalPages,
+    currentPage,
+    pageSize,
+  };
 }
 
 export async function getLibraryItem(id: number): Promise<LibraryItem> {

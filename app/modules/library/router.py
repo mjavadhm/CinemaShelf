@@ -54,19 +54,49 @@ async def add_item_to_library(
 @router.get("/items", response_model=list[LibraryItemSummaryResponse])
 def list_library_items(
     service: Annotated[LibraryService, Depends(get_library_service)],
+    response: Response,
     status: Annotated[
         LibraryItemStatus | None, Query(description="Filter by item status")
     ] = None,
     library_id: Annotated[
         int | None, Query(description="Filter by parent library ID")
     ] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    search: Annotated[
+        str | None, Query(description="Search title, original title, or imdb ID")
+    ] = None,
+    genre: Annotated[
+        str | None, Query(description="Filter by genre name or persian_name")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    page: Annotated[int | None, Query(ge=1, description="1-indexed page number")] = None,
 ) -> list[LibraryItemSummaryResponse]:
-    """List library items with optional status and library filtering."""
-    items = service.list_items(
-        status=status, library_id=library_id, limit=limit, offset=offset
+    """List library items with optional search, genre, status, and library filtering."""
+    actual_offset = (page - 1) * limit if page is not None else offset
+
+    total_count = service.count_items(
+        status=status,
+        library_id=library_id,
+        search=search,
+        genre=genre,
     )
+    items = service.list_items(
+        status=status,
+        library_id=library_id,
+        search=search,
+        genre=genre,
+        limit=limit,
+        offset=actual_offset,
+    )
+
+    total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
+    current_page = (actual_offset // limit) + 1 if limit > 0 else 1
+
+    response.headers["X-Total-Count"] = str(total_count)
+    response.headers["X-Total-Pages"] = str(total_pages)
+    response.headers["X-Current-Page"] = str(current_page)
+    response.headers["X-Page-Size"] = str(limit)
+
     return [LibraryItemSummaryResponse.model_validate(item) for item in items]
 
 

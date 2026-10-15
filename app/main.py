@@ -51,6 +51,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Total-Count", "X-Total-Pages", "X-Current-Page", "X-Page-Size"],
     )
 
     @app.exception_handler(ApplicationError)

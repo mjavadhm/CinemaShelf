@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.modules.library.models import (
@@ -14,6 +14,7 @@ from app.modules.library.models import (
     MediaFile,
     ScanJob,
 )
+from app.modules.metadata.models import MediaWork
 
 
 class LibraryRepository:
@@ -46,22 +47,14 @@ class LibraryRepository:
         )
         return self.session.scalars(stmt).first()
 
-    def list_items(
+    def _build_items_query(
         self,
         status: LibraryItemStatus | None = None,
         library_id: int | None = None,
-        limit: int = 50,
-        offset: int = 0,
-    ) -> Sequence[LibraryItem]:
-        """List library items with optional status and library filtering."""
-        stmt = (
-            select(LibraryItem)
-            .options(
-                joinedload(LibraryItem.work),
-                selectinload(LibraryItem.media_files),
-            )
-            .order_by(LibraryItem.added_at.desc())
-        )
+        search: str | None = None,
+        genre: str | None = None,
+    ):
+        stmt = select(LibraryItem)
         if library_id is not None:
             stmt = stmt.join(
                 LibraryMembership, LibraryMembership.work_id == LibraryItem.work_id
@@ -70,8 +63,73 @@ class LibraryRepository:
         if status:
             stmt = stmt.where(LibraryItem.status == status)
 
+        if search or (genre and genre != "ALL"):
+            stmt = stmt.join(MediaWork, MediaWork.id == LibraryItem.work_id)
+
+        if search:
+            q = f"%{search.strip().lower()}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(MediaWork.title).like(q),
+                    func.lower(MediaWork.original_title).like(q),
+                    func.lower(MediaWork.persian_title).like(q),
+                    func.lower(MediaWork.imdb_id).like(q),
+                )
+            )
+
+        if genre and genre != "ALL":
+            from app.modules.metadata.models import Genre, WorkGenre
+
+            stmt = (
+                stmt.join(WorkGenre, WorkGenre.work_id == MediaWork.id)
+                .join(Genre, Genre.id == WorkGenre.genre_id)
+                .where(
+                    or_(
+                        Genre.name == genre,
+                        Genre.persian_name == genre,
+                    )
+                )
+            )
+
+        return stmt
+
+    def list_items(
+        self,
+        status: LibraryItemStatus | None = None,
+        library_id: int | None = None,
+        search: str | None = None,
+        genre: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Sequence[LibraryItem]:
+        """List library items with optional status, library, search, and genre filtering."""
+        stmt = (
+            self._build_items_query(
+                status=status, library_id=library_id, search=search, genre=genre
+            )
+            .options(
+                joinedload(LibraryItem.work),
+                selectinload(LibraryItem.media_files),
+            )
+            .order_by(LibraryItem.added_at.desc())
+        )
         stmt = stmt.limit(limit).offset(offset)
-        return self.session.scalars(stmt).all()
+        return self.session.scalars(stmt).unique().all()
+
+    def count_items(
+        self,
+        status: LibraryItemStatus | None = None,
+        library_id: int | None = None,
+        search: str | None = None,
+        genre: str | None = None,
+    ) -> int:
+        """Count total library items matching query filters."""
+        stmt = self._build_items_query(
+            status=status, library_id=library_id, search=search, genre=genre
+        )
+        subq = stmt.subquery()
+        count_stmt = select(func.count()).select_from(subq)
+        return self.session.scalar(count_stmt) or 0
 
     def get_all_media_files(self) -> Sequence[MediaFile]:
         """Fetch all registered media files across all items."""

@@ -9,53 +9,53 @@ export interface LibraryFilters {
   genre?: string;
   resolution?: string;
   onlineOnly?: boolean;
+  page?: number;
+  pageSize?: number;
 }
 
 export function useLibraryItems(filters: LibraryFilters = {}) {
+  const page = filters.page || 1;
+  const pageSize = filters.pageSize || 48;
+  const searchTrimmed = filters.search?.trim() || undefined;
+  const genreParam = filters.genre && filters.genre !== 'ALL' ? filters.genre : undefined;
+
   const query = useQuery({
-    queryKey: ['library-items', filters.status, filters.libraryId],
+    queryKey: [
+      'library-items',
+      filters.status,
+      filters.libraryId,
+      searchTrimmed,
+      genreParam,
+      page,
+      pageSize,
+    ],
     queryFn: () =>
       getLibraryItems({
         status: filters.status,
         library_id: filters.libraryId || undefined,
-        limit: 100,
+        search: searchTrimmed,
+        genre: genreParam,
+        limit: pageSize,
+        page: page,
       }),
   });
 
-  const allItems: LibraryItem[] = query.data || [];
+  const items = query.data?.items || [];
+  const totalCount = query.data?.totalCount || 0;
+  const totalPages = query.data?.totalPages || 1;
 
   // Extract all distinct genres across the fetched items
   const allGenres = Array.from(
     new Set(
-      allItems.flatMap((item) =>
+      items.flatMap((item) =>
         (item.work.genres || []).map((g) => g.persian_name || g.name)
       )
     )
   ).filter(Boolean);
 
   // Compute filtered items
-  const filteredItems = allItems.filter((item) => {
-    const movie = item.work;
+  const filteredItems = items.filter((item) => {
     const files = item.media_files || [];
-
-    // Search filter
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      const titleMatch = movie.title.toLowerCase().includes(q);
-      const persianMatch = movie.persian_title?.toLowerCase().includes(q);
-      const imdbMatch = movie.imdb_id?.toLowerCase().includes(q);
-      if (!titleMatch && !persianMatch && !imdbMatch) {
-        return false;
-      }
-    }
-
-    // Genre filter
-    if (filters.genre && filters.genre !== 'ALL') {
-      const hasGenre = (movie.genres || []).some(
-        (g) => (g.persian_name || g.name) === filters.genre
-      );
-      if (!hasGenre) return false;
-    }
 
     // Resolution filter
     if (filters.resolution && filters.resolution !== 'ALL') {
@@ -80,9 +80,12 @@ export function useLibraryItems(filters: LibraryFilters = {}) {
   return {
     ...query,
     items: filteredItems,
-    allItems,
+    allItems: items,
     allGenres,
-    totalCount: allItems.length,
+    totalCount,
+    totalPages,
+    currentPage: page,
+    pageSize,
     filteredCount: filteredItems.length,
   };
 }
