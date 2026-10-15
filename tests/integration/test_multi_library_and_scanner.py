@@ -4,13 +4,19 @@ import uuid
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
+from app.core.database import get_db_session
 from app.main import app
 
 
 @pytest.fixture
-def client():
-    return TestClient(app)
+def client(db_session: Session):
+    app.dependency_overrides[get_db_session] = lambda: db_session
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.pop(get_db_session, None)
 
 
 def test_create_and_list_libraries(client: TestClient):

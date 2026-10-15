@@ -176,6 +176,11 @@ class LibraryRepository:
         stmt = select(LibraryRoot).where(LibraryRoot.library_id == library_id).order_by(LibraryRoot.id.asc())
         return self.session.scalars(stmt).all()
 
+    def list_all_roots(self) -> Sequence[LibraryRoot]:
+        """Fetch all configured storage roots across all libraries."""
+        stmt = select(LibraryRoot).order_by(LibraryRoot.id.asc())
+        return self.session.scalars(stmt).all()
+
     def delete_root(self, root: LibraryRoot) -> None:
         """Delete a storage root folder."""
         self.session.delete(root)

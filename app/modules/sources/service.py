@@ -149,8 +149,16 @@ class SourcesService:
                 status_code=400,
             )
 
-        dest_dir = request.destination_dir or str(self.settings.download_dir)
-        Path(dest_dir).mkdir(parents=True, exist_ok=True)
+        dest_path = (
+            Path(request.destination_dir).expanduser().resolve()
+            if request.destination_dir
+            else self.settings.download_dir.resolve()
+        )
+        try:
+            dest_path.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError):
+            pass
+        dest_dir = str(dest_path)
 
         task = DownloadTask(
             library_item_id=request.library_item_id,
@@ -178,7 +186,7 @@ class SourcesService:
                 task.started_at = datetime.now(UTC)
             except Exception as exc:
                 logger.error("Failed to enqueue URI into Aria2: %s", exc)
-                task.status = DownloadTaskStatus.FAILED
+                task.status = DownloadTaskStatus.ERROR
                 task.error_message = str(exc)
                 self.session.commit()
                 raise ProviderUnavailableError(
@@ -258,7 +266,7 @@ class SourcesService:
                 task.status = DownloadTaskStatus.ACTIVE
                 task.started_at = datetime.now(UTC)
             except Exception as exc:
-                task.status = DownloadTaskStatus.FAILED
+                task.status = DownloadTaskStatus.ERROR
                 task.error_message = str(exc)
                 self.session.commit()
                 raise ProviderUnavailableError(
@@ -273,6 +281,17 @@ class SourcesService:
         task = self.get_task(task_id)
         if task.aria2_gid:
             self.aria2.remove(task.aria2_gid)
+
+        if task.status in (
+            DownloadTaskStatus.ERROR,
+            DownloadTaskStatus.REMOVED,
+            DownloadTaskStatus.COMPLETED,
+        ):
+            self.repository.delete_task(task)
+            self.session.commit()
+            task.status = DownloadTaskStatus.REMOVED
+            return task
+
         task.status = DownloadTaskStatus.REMOVED
         self.session.commit()
         return task

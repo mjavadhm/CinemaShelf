@@ -273,8 +273,16 @@ class Aria2Client:
     ) -> str:
         """Enqueue download URI and return the GID."""
         options: dict[str, Any] = {}
-        target_dir = destination_dir or str(self.settings.download_dir.resolve())
-        options["dir"] = target_dir
+        target_path = (
+            Path(destination_dir).expanduser().resolve()
+            if destination_dir
+            else self.settings.download_dir.resolve()
+        )
+        try:
+            target_path.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError):
+            pass
+        options["dir"] = str(target_path)
         if file_name:
             options["out"] = file_name
 
@@ -328,13 +336,17 @@ class Aria2Client:
             return False
 
     def remove(self, gid: str) -> bool:
-        """Remove a download task from Aria2."""
+        """Remove a download task from Aria2, falling back to removeDownloadResult."""
         try:
             self._call("aria2.remove", gid)
             return True
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to remove Aria2 GID %s: %s", gid, exc)
-            return False
+        except Exception:
+            try:
+                self._call("aria2.removeDownloadResult", gid)
+                return True
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Aria2 GID %s already removed or not found: %s", gid, exc)
+                return True
 
     def pause_all(self) -> bool:
         """Pause all active tasks."""

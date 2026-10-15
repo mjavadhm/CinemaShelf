@@ -316,11 +316,21 @@ export interface DirectoryEntry {
   has_subdirectories: boolean;
 }
 
+export interface StorageDriveShortcut {
+  id: string;
+  label: string;
+  mount_path: string;
+  total_bytes?: number | null;
+  free_bytes?: number | null;
+  is_external: boolean;
+}
+
 export interface DirectoryBrowseResponse {
   current_path: string;
   parent_path?: string | null;
   is_writable: boolean;
   directories: DirectoryEntry[];
+  system_drives?: StorageDriveShortcut[];
   total_bytes?: number | null;
   used_bytes?: number | null;
   free_bytes?: number | null;

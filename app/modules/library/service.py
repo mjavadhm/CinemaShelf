@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 import re
@@ -5,7 +6,10 @@ import shutil
 from collections.abc import Sequence
 from typing import Any
 
+import psutil
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import get_settings
 from app.core.errors import ApplicationError
@@ -30,6 +34,7 @@ from app.modules.library.schemas import (
     LibraryRootResponse,
     MediaFileCreate,
     ScanJobResponse,
+    StorageDriveShortcut,
     StorageVolumeResponse,
 )
 from app.modules.metadata.service import MetadataService
@@ -171,6 +176,114 @@ class LibraryService:
             )
         return item
 
+    @staticmethod
+    def _discover_system_drives() -> list[StorageDriveShortcut]:
+        """Discover mounted storage volumes and partitions accessible to the server."""
+        drives: list[StorageDriveShortcut] = []
+        seen_paths: set[str] = set()
+
+        # 1. User Home Directory
+        try:
+            home = Path.home().resolve()
+            if home.exists() and str(home) not in seen_paths:
+                usage = shutil.disk_usage(str(home))
+                drives.append(
+                    StorageDriveShortcut(
+                        id="user_home",
+                        label=f"خانه کاربر ({home.name})",
+                        mount_path=str(home),
+                        total_bytes=usage.total,
+                        free_bytes=usage.free,
+                        is_external=False,
+                    )
+                )
+                seen_paths.add(str(home))
+        except (OSError, PermissionError):
+            pass
+
+        # 2. psutil disk partitions (Linux mounts, Windows drive letters, etc.)
+        try:
+            partitions = psutil.disk_partitions(all=False)
+        except Exception:
+            partitions = []
+
+        for p in partitions:
+            try:
+                mp = Path(p.mountpoint).resolve()
+                mp_str = str(mp)
+                dev = p.device
+                fstype = p.fstype
+
+                if dev.startswith("/dev/loop") or fstype in {"squashfs", "tmpfs", "devtmpfs", "overlay"}:
+                    continue
+                if any(
+                    mp_str.startswith(skip)
+                    for skip in ["/var/lib/snapd", "/snap", "/boot", "/etc", "/sys", "/proc", "/dev"]
+                ):
+                    continue
+                if mp_str in seen_paths:
+                    continue
+
+                usage = shutil.disk_usage(mp_str)
+                is_ext = any(
+                    mp_str.startswith(prefix)
+                    for prefix in ["/run/media", "/media", "/mnt", "/Volumes"]
+                )
+
+                if is_ext:
+                    label = f"هارد اکسترنال ({mp.name})"
+                elif mp_str == "/":
+                    label = "دیسک سیستم (/)"
+                elif mp_str == "/home":
+                    label = "پارتیشن کاربری (/home)"
+                else:
+                    label = mp.name or mp_str
+
+                drive_id = re.sub(r"[^a-zA-Z0-9_-]", "_", mp.name.lower()).strip("_") or f"drive_{len(drives)}"
+
+                drives.append(
+                    StorageDriveShortcut(
+                        id=drive_id,
+                        label=label,
+                        mount_path=mp_str,
+                        total_bytes=usage.total,
+                        free_bytes=usage.free,
+                        is_external=is_ext,
+                    )
+                )
+                seen_paths.add(mp_str)
+            except (OSError, PermissionError):
+                continue
+
+        # 3. Explicit check for external drive mount points in /run/media, /media, /mnt
+        for base_mount in ["/run/media", "/media", "/mnt"]:
+            base_p = Path(base_mount)
+            if not base_p.exists():
+                continue
+            try:
+                for sub in base_p.glob("*/*"):
+                    if sub.is_dir() and str(sub) not in seen_paths:
+                        try:
+                            usage = shutil.disk_usage(str(sub))
+                            drive_id = re.sub(r"[^a-zA-Z0-9_-]", "_", sub.name.lower()).strip("_") or f"ext_{len(drives)}"
+                            drives.append(
+                                StorageDriveShortcut(
+                                    id=drive_id,
+                                    label=f"هارد اکسترنال ({sub.name})",
+                                    mount_path=str(sub),
+                                    total_bytes=usage.total,
+                                    free_bytes=usage.free,
+                                    is_external=True,
+                                )
+                            )
+                            seen_paths.add(str(sub))
+                        except (OSError, PermissionError):
+                            pass
+            except (OSError, PermissionError):
+                pass
+
+        return drives
+
     def get_storage_volumes(self) -> list[StorageVolumeResponse]:
         """Detect and return storage volumes status (online/offline, used, total space)."""
         settings = get_settings()
@@ -178,21 +291,36 @@ class LibraryService:
 
         # 1. Configured local download directory
         dl_path = str(settings.download_dir.resolve())
-        detected_paths[dl_path] = "Internal Storage (Downloads)"
+        detected_paths[dl_path] = "حافظه داخلی (دانلودها)"
 
-        # 2. Paths from LibraryItem roots
-        for root in self.repository.get_all_root_folders():
-            if root:
-                mount_pt, label = self._resolve_volume(root)
-                if mount_pt not in detected_paths:
-                    detected_paths[mount_pt] = label
+        # 2. Configured LibraryRoot records from database
+        for root in self.repository.list_all_roots():
+            if root.mount_path and root.mount_path not in detected_paths:
+                detected_paths[root.mount_path] = root.label or Path(root.mount_path).name
 
-        # 3. Paths from registered MediaFiles
+        # 3. Discovered external drives
+        discovered_drives = self._discover_system_drives()
+        for drive in discovered_drives:
+            if drive.is_external and drive.mount_path not in detected_paths:
+                detected_paths[drive.mount_path] = drive.label
+
+        # 4. Paths from registered MediaFiles (only if matching a real path or known external prefix)
         for media_file in self.repository.get_all_media_files():
             if media_file.file_path:
-                mount_pt, label = self._resolve_volume(media_file.file_path)
-                if mount_pt not in detected_paths:
-                    detected_paths[mount_pt] = label
+                resolved = self._resolve_volume(media_file.file_path)
+                if resolved:
+                    mount_pt, label = resolved
+                    if mount_pt not in detected_paths:
+                        detected_paths[mount_pt] = label
+
+        # 5. Paths from existing LibraryItem roots (if any exist)
+        for item_root in self.repository.get_all_root_folders():
+            if item_root:
+                resolved = self._resolve_volume(item_root)
+                if resolved:
+                    mount_pt, label = resolved
+                    if mount_pt not in detected_paths:
+                        detected_paths[mount_pt] = label
 
         volumes: list[StorageVolumeResponse] = []
         for mount_path, label in detected_paths.items():
@@ -221,32 +349,30 @@ class LibraryService:
         return volumes
 
     @staticmethod
-    def _resolve_volume(path_str: str) -> tuple[str, str]:
+    def _resolve_volume(path_str: str) -> tuple[str, str] | None:
         """Extract mount directory and user-friendly drive label from a file/folder path."""
         p = Path(path_str)
         parts = p.parts
         # Check /run/media/<user>/<label>
         if len(parts) >= 5 and parts[1] == "run" and parts[2] == "media":
-            return str(Path(*parts[:5])), parts[4]
+            return str(Path(*parts[:5])), f"هارد اکسترنال ({parts[4]})"
         # Check /media/<user>/<label>
         if len(parts) >= 4 and parts[1] == "media":
-            return str(Path(*parts[:4])), parts[3]
+            return str(Path(*parts[:4])), f"هارد اکسترنال ({parts[3]})"
         # Check /mnt/<label>
         if len(parts) >= 3 and parts[1] == "mnt":
-            return str(Path(*parts[:3])), parts[2]
+            return str(Path(*parts[:3])), f"هارد اکسترنال ({parts[2]})"
 
-        # If existing path, check real mount point
+        # If existing path on filesystem, find real mount point
         if os.path.exists(path_str):
             cur = p.resolve()
             while not os.path.ismount(cur) and cur.parent != cur:
                 cur = cur.parent
-            label = cur.name if cur.name else "Internal Storage"
+            label = cur.name if cur.name else ("دیسک سیستم" if str(cur) == "/" else str(cur))
             return str(cur), label
 
-        # Non-existing path: use parent folder as label
-        parent = str(p.parent)
-        label = p.parent.name or "External Storage"
-        return parent, label
+        # Non-existing path: do not invent phantom offline volumes for temporary or test paths
+        return None
 
     # -------------------------------------------------------------------------
     # Multi-Library Operations
@@ -434,11 +560,14 @@ class LibraryService:
         except OSError:
             pass
 
+        system_drives = self._discover_system_drives()
+
         return DirectoryBrowseResponse(
             current_path=str(start),
             parent_path=parent_str,
             is_writable=os.access(str(start), os.W_OK),
             directories=entries,
+            system_drives=system_drives,
             total_bytes=total_b,
             used_bytes=used_b,
             free_bytes=free_b,

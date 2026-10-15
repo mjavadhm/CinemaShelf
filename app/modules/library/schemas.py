@@ -201,6 +201,17 @@ class DirectoryEntry(BaseModel):
     has_subdirectories: bool = False
 
 
+class StorageDriveShortcut(BaseModel):
+    """Shortcut descriptor for an accessible system or external drive."""
+
+    id: str
+    label: str
+    mount_path: str
+    total_bytes: int | None = None
+    free_bytes: int | None = None
+    is_external: bool = False
+
+
 class DirectoryBrowseResponse(BaseModel):
     """Server filesystem directory listing response."""
 
@@ -208,6 +219,7 @@ class DirectoryBrowseResponse(BaseModel):
     parent_path: str | None = None
     is_writable: bool
     directories: list[DirectoryEntry] = Field(default_factory=list)
+    system_drives: list[StorageDriveShortcut] = Field(default_factory=list)
     total_bytes: int | None = None
     used_bytes: int | None = None
     free_bytes: int | None = None

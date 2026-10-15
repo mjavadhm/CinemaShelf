@@ -9,6 +9,8 @@ import {
   HardDrive,
   Loader2,
   Lock,
+  Home,
+  Usb,
 } from 'lucide-react';
 import { useDirectoryBrowser } from '../hooks/useLibraries';
 
@@ -70,6 +72,48 @@ export const FolderBrowserModal: React.FC<Props> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Drive Quick Shortcuts */}
+        {data?.system_drives && data.system_drives.length > 0 && (
+          <div className="px-3 py-2 bg-slate-900/80 border-b border-shelf-border flex items-center gap-2 overflow-x-auto">
+            <span className="text-[11px] text-slate-400 font-medium shrink-0">دیسک‌ها و درایوها:</span>
+            <div className="flex items-center gap-1.5 flex-nowrap">
+              {data.system_drives.map((drive) => {
+                const isSelected = (data?.current_path || currentPath).startsWith(drive.mount_path);
+                const driveFreeGb = drive.free_bytes
+                  ? (drive.free_bytes / (1024 * 1024 * 1024)).toFixed(0)
+                  : null;
+
+                return (
+                  <button
+                    key={drive.id}
+                    onClick={() => handleNavigate(drive.mount_path)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition border shrink-0 ${
+                      isSelected
+                        ? 'bg-shelf-amber/15 text-shelf-amber border-shelf-amber/40 shadow-sm'
+                        : 'bg-shelf-bg/60 text-slate-300 hover:text-white hover:bg-slate-800 border-shelf-border'
+                    }`}
+                    title={drive.mount_path}
+                  >
+                    {drive.is_external ? (
+                      <Usb className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    ) : drive.id === 'user_home' ? (
+                      <Home className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    ) : (
+                      <HardDrive className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    )}
+                    <span>{drive.label}</span>
+                    {driveFreeGb && (
+                      <span className="text-[10px] opacity-75 font-mono">
+                        ({driveFreeGb} GB)
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Current Path Bar & Parent Navigation */}
         <div className="p-3 bg-shelf-bg border-b border-shelf-border flex items-center gap-2 text-xs" dir="ltr">
