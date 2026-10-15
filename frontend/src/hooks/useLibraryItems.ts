@@ -4,6 +4,7 @@ import { LibraryItem } from '../types/api';
 
 export interface LibraryFilters {
   status?: string;
+  libraryId?: number | null;
   search?: string;
   genre?: string;
   resolution?: string;
@@ -12,8 +13,13 @@ export interface LibraryFilters {
 
 export function useLibraryItems(filters: LibraryFilters = {}) {
   const query = useQuery({
-    queryKey: ['library-items', filters.status],
-    queryFn: () => getLibraryItems({ status: filters.status, limit: 100 }),
+    queryKey: ['library-items', filters.status, filters.libraryId],
+    queryFn: () =>
+      getLibraryItems({
+        status: filters.status,
+        library_id: filters.libraryId || undefined,
+        limit: 100,
+      }),
   });
 
   const allItems: LibraryItem[] = query.data || [];

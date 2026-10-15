@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, HardDrive, Filter, Plus, BookmarkCheck, Film, Loader2 } from 'lucide-react';
+import { Star, HardDrive, Filter, Plus, BookmarkCheck, Film, Loader2, FolderOpen } from 'lucide-react';
 import { useLibraryItems } from '../hooks/useLibraryItems';
+import { useLibraries } from '../hooks/useLibraries';
 import { getTmdbImageUrl, LibraryItem } from '../types/api';
 import { AddWorkModal } from '../components/AddWorkModal';
+import { ManageLibrariesModal } from '../components/ManageLibrariesModal';
 
 function getBestResolution(item: LibraryItem): string {
   const files = item.media_files || [];
@@ -29,10 +31,14 @@ function isItemOnline(item: LibraryItem): boolean {
 }
 
 export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) => {
+  const [selectedLibraryId, setSelectedLibraryId] = useState<number | null>(null);
   const [resolutionFilter, setResolutionFilter] = useState<string>('ALL');
   const [onlineOnly, setOnlineOnly] = useState<boolean>(false);
   const [selectedGenre, setSelectedGenre] = useState<string>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isManageLibrariesOpen, setIsManageLibrariesOpen] = useState(false);
+
+  const { libraries } = useLibraries();
 
   const {
     items,
@@ -43,6 +49,7 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
     isError,
     error,
   } = useLibraryItems({
+    libraryId: selectedLibraryId,
     search: searchQuery,
     genre: selectedGenre,
     resolution: resolutionFilter,
@@ -62,6 +69,24 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
 
         {/* Consolidated 1-Row Filter Controls */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* Library Selector */}
+          {libraries.length > 0 && (
+            <select
+              value={selectedLibraryId === null ? 'ALL' : selectedLibraryId}
+              onChange={(e) =>
+                setSelectedLibraryId(e.target.value === 'ALL' ? null : Number(e.target.value))
+              }
+              className="bg-shelf-bg border border-shelf-border rounded-lg px-3 py-1.5 text-xs text-shelf-amber font-medium focus:outline-none focus:border-shelf-amber"
+            >
+              <option value="ALL">همه کتابخانه‌ها ({libraries.length})</option>
+              {libraries.map((lib) => (
+                <option key={lib.id} value={lib.id}>
+                  {lib.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <Filter className="w-3.5 h-3.5 text-shelf-amber" />
             <span>فیلتر:</span>
@@ -104,7 +129,15 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
                 onlineOnly ? 'bg-emerald-400' : 'bg-slate-500'
               }`}
             />
-            فقط هاردهای متصل (آماده پخش)
+            فقط هاردهای متصل
+          </button>
+
+          <button
+            onClick={() => setIsManageLibrariesOpen(true)}
+            className="p-1.5 rounded-lg bg-shelf-bg border border-shelf-border text-slate-300 hover:text-white hover:border-slate-600 transition"
+            title="مدیریت ریشه‌ها و اسکن هارد"
+          >
+            <FolderOpen className="w-4 h-4 text-shelf-amber" />
           </button>
         </div>
       </div>
@@ -145,16 +178,23 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
           <div>
             <h3 className="text-base font-bold text-white">هنوز اثری در کتابخانه ثبت نشده است</h3>
             <p className="text-xs text-slate-400 mt-1">
-              می‌توانید با جستجوی عنوان در TMDB اثر دلخواه خود را بیفزایید یا آرشیو Letterboxd خود را وارد کنید.
+              می‌توانید با افزودن پوشه هارددیسک و اسکن خودکار، یا با جستجوی عنوان در TMDB اثر دلخواه خود را بیفزایید.
             </p>
           </div>
-          <div className="flex justify-center gap-3 pt-2">
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => setIsManageLibrariesOpen(true)}
               className="px-4 py-2 rounded-lg bg-shelf-amber hover:bg-shelf-amberHover text-black font-bold text-xs flex items-center gap-1.5 shadow-md shadow-shelf-amber/10 transition"
             >
+              <FolderOpen className="w-4 h-4" />
+              <span>افزودن پوشه و اسکن آرشیو</span>
+            </button>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs flex items-center gap-1.5 border border-shelf-border transition"
+            >
               <Plus className="w-4 h-4" />
-              <span>افزودن اولین فیلم از TMDB</span>
+              <span>جستجو و افزودن از TMDB</span>
             </button>
             <Link
               to="/watchlist"
@@ -273,6 +313,12 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
           })}
         </div>
       )}
+
+      {/* Manage Libraries Modal */}
+      <ManageLibrariesModal
+        isOpen={isManageLibrariesOpen}
+        onClose={() => setIsManageLibrariesOpen(false)}
+      />
 
       {/* Add Work Modal */}
       <AddWorkModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />

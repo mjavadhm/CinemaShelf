@@ -116,3 +116,99 @@ class LibraryItemDetailResponse(BaseModel):
     work: MediaWorkSummaryResponse
     media_files: list[MediaFileResponse] = Field(default_factory=list)
     personal_record: PersonalSummary | None = None
+
+
+# -----------------------------------------------------------------------------
+# Multi-Library & Storage Roots Schemas
+# -----------------------------------------------------------------------------
+
+
+class LibraryCreate(BaseModel):
+    """Payload to create a new named library."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    content_type: str = "MOVIE"
+    preferred_language: str = "fa"
+
+
+class LibraryRootCreate(BaseModel):
+    """Payload to add a storage root folder to a library."""
+
+    label: str = Field(..., min_length=1, max_length=255)
+    mount_path: str = Field(..., min_length=1, max_length=1000)
+
+
+class LibraryRootResponse(BaseModel):
+    """Details of a registered storage root."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    library_id: int
+    label: str
+    mount_path: str
+    is_online: bool
+    is_writable: bool
+    used_bytes: int | None = 0
+    total_bytes: int | None = 0
+    last_scanned_at: datetime | None = None
+    created_at: datetime
+
+
+class LibraryResponse(BaseModel):
+    """Response representing a named library collection."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    content_type: str
+    default_download_root_id: int | None = None
+    preferred_language: str
+    roots: list[LibraryRootResponse] = Field(default_factory=list)
+    movie_count: int = 0
+    created_at: datetime
+
+
+class ScanJobResponse(BaseModel):
+    """Details and progress of a library filesystem scan."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    library_id: int
+    root_id: int | None = None
+    status: str
+    files_discovered: int
+    files_imported: int
+    files_unmatched: int
+    error_message: str | None = None
+    started_at: datetime
+    completed_at: datetime | None = None
+
+
+# -----------------------------------------------------------------------------
+# Server Filesystem Directory Browser Schemas
+# -----------------------------------------------------------------------------
+
+
+class DirectoryEntry(BaseModel):
+    """Single directory item returned by server directory browser."""
+
+    name: str
+    path: str
+    is_writable: bool
+    has_subdirectories: bool = False
+
+
+class DirectoryBrowseResponse(BaseModel):
+    """Server filesystem directory listing response."""
+
+    current_path: str
+    parent_path: str | None = None
+    is_writable: bool
+    directories: list[DirectoryEntry] = Field(default_factory=list)
+    total_bytes: int | None = None
+    used_bytes: int | None = None
+    free_bytes: int | None = None
+

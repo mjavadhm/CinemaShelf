@@ -1,17 +1,21 @@
 import { apiClient } from './client';
 import {
   Aria2Stats,
+  DirectoryBrowseResponse,
   DownloadTask,
   ExternalSearchResult,
   FileAccessResult,
   ImportSummary,
+  Library,
   LibraryItem,
+  LibraryRoot,
   MediaFile,
   MediaWorkDetail,
   MediaWorkSummary,
   PersonDetail,
   PersonalRecord,
   PersonalWorkCatalogItem,
+  ScanJob,
   SourceRelease,
   StorageVolume,
   WatchStatusResult,
@@ -24,6 +28,7 @@ import {
 
 export async function getLibraryItems(params?: {
   status?: string;
+  library_id?: number;
   limit?: number;
   offset?: number;
 }): Promise<LibraryItem[]> {
@@ -410,3 +415,75 @@ export async function listSyncRuns(params?: {
   const response = await apiClient.get('/integrations/sync-runs', { params });
   return response.data;
 }
+
+// -----------------------------------------------------------------------------
+// Multi-Library, Roots, Scanning & Directory Browser
+// -----------------------------------------------------------------------------
+
+export async function getLibraries(): Promise<Library[]> {
+  const response = await apiClient.get<Library[]>('/library/libraries');
+  return response.data;
+}
+
+export async function createLibrary(data: {
+  name: string;
+  content_type?: string;
+  preferred_language?: string;
+}): Promise<Library> {
+  const response = await apiClient.post<Library>('/library/libraries', data);
+  return response.data;
+}
+
+export async function getLibrary(id: number): Promise<Library> {
+  const response = await apiClient.get<Library>(`/library/libraries/${id}`);
+  return response.data;
+}
+
+export async function deleteLibrary(id: number): Promise<void> {
+  await apiClient.delete(`/library/libraries/${id}`);
+}
+
+export async function addLibraryRoot(
+  libraryId: number,
+  data: { label: string; mount_path: string }
+): Promise<LibraryRoot> {
+  const response = await apiClient.post<LibraryRoot>(
+    `/library/libraries/${libraryId}/roots`,
+    data
+  );
+  return response.data;
+}
+
+export async function removeLibraryRoot(rootId: number): Promise<void> {
+  await apiClient.delete(`/library/roots/${rootId}`);
+}
+
+export async function triggerLibraryScan(
+  libraryId: number,
+  rootId?: number
+): Promise<ScanJob> {
+  const response = await apiClient.post<ScanJob>(
+    `/library/libraries/${libraryId}/scan`,
+    null,
+    { params: rootId ? { root_id: rootId } : undefined }
+  );
+  return response.data;
+}
+
+export async function getLibraryScanJobs(libraryId: number): Promise<ScanJob[]> {
+  const response = await apiClient.get<ScanJob[]>(
+    `/library/libraries/${libraryId}/scan-jobs`
+  );
+  return response.data;
+}
+
+export async function browseServerDirectories(
+  path?: string
+): Promise<DirectoryBrowseResponse> {
+  const response = await apiClient.get<DirectoryBrowseResponse>(
+    '/library/directories/browse',
+    { params: path ? { path } : undefined }
+  );
+  return response.data;
+}
+

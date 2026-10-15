@@ -271,6 +271,60 @@ export interface WatchStatusResult {
   last_watched_at?: string | null;
 }
 
+export interface LibraryRoot {
+  id: number;
+  library_id: number;
+  label: string;
+  mount_path: string;
+  is_online: boolean;
+  is_writable: boolean;
+  used_bytes?: number | null;
+  total_bytes?: number | null;
+  last_scanned_at?: string | null;
+  created_at: string;
+}
+
+export interface Library {
+  id: number;
+  name: string;
+  content_type: string;
+  default_download_root_id?: number | null;
+  preferred_language: string;
+  roots: LibraryRoot[];
+  movie_count: number;
+  created_at: string;
+}
+
+export interface ScanJob {
+  id: number;
+  library_id: number;
+  root_id?: number | null;
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  files_discovered: number;
+  files_imported: number;
+  files_unmatched: number;
+  error_message?: string | null;
+  started_at: string;
+  completed_at?: string | null;
+}
+
+export interface DirectoryEntry {
+  name: string;
+  path: string;
+  is_writable: boolean;
+  has_subdirectories: boolean;
+}
+
+export interface DirectoryBrowseResponse {
+  current_path: string;
+  parent_path?: string | null;
+  is_writable: boolean;
+  directories: DirectoryEntry[];
+  total_bytes?: number | null;
+  used_bytes?: number | null;
+  free_bytes?: number | null;
+}
+
 /**
  * Helper to construct full TMDB image URLs safely.
  */

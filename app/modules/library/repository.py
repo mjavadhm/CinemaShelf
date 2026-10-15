@@ -5,7 +5,15 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.modules.library.models import LibraryItem, LibraryItemStatus, MediaFile
+from app.modules.library.models import (
+    Library,
+    LibraryItem,
+    LibraryItemStatus,
+    LibraryMembership,
+    LibraryRoot,
+    MediaFile,
+    ScanJob,
+)
 
 
 class LibraryRepository:
@@ -41,10 +49,11 @@ class LibraryRepository:
     def list_items(
         self,
         status: LibraryItemStatus | None = None,
+        library_id: int | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> Sequence[LibraryItem]:
-        """List library items with optional status filtering."""
+        """List library items with optional status and library filtering."""
         stmt = (
             select(LibraryItem)
             .options(
@@ -53,6 +62,11 @@ class LibraryRepository:
             )
             .order_by(LibraryItem.added_at.desc())
         )
+        if library_id is not None:
+            stmt = stmt.join(
+                LibraryMembership, LibraryMembership.work_id == LibraryItem.work_id
+            ).where(LibraryMembership.library_id == library_id)
+
         if status:
             stmt = stmt.where(LibraryItem.status == status)
 
@@ -97,3 +111,94 @@ class LibraryRepository:
     def get_media_file_by_id(self, file_id: int) -> MediaFile | None:
         """Fetch MediaFile by ID."""
         return self.session.get(MediaFile, file_id)
+
+    # -------------------------------------------------------------------------
+    # Multi-Library Persistence
+    # -------------------------------------------------------------------------
+
+    def create_library(self, library: Library) -> Library:
+        """Persist a new Library collection."""
+        self.session.add(library)
+        self.session.flush()
+        return library
+
+    def get_library_by_id(self, library_id: int) -> Library | None:
+        """Fetch Library by ID eagerly loading roots and memberships."""
+        stmt = (
+            select(Library)
+            .where(Library.id == library_id)
+            .options(
+                selectinload(Library.roots),
+                selectinload(Library.memberships),
+            )
+        )
+        return self.session.scalars(stmt).first()
+
+    def get_library_by_name(self, name: str) -> Library | None:
+        """Fetch Library by unique name."""
+        stmt = select(Library).where(Library.name == name)
+        return self.session.scalars(stmt).first()
+
+    def list_libraries(self) -> Sequence[Library]:
+        """List all libraries with their configured roots."""
+        stmt = select(Library).options(
+            selectinload(Library.roots),
+            selectinload(Library.memberships),
+        ).order_by(Library.id.asc())
+        return self.session.scalars(stmt).all()
+
+    def delete_library(self, library: Library) -> None:
+        """Delete a library entity and cascade."""
+        self.session.delete(library)
+        self.session.flush()
+
+    # -------------------------------------------------------------------------
+    # Library Roots Persistence
+    # -------------------------------------------------------------------------
+
+    def create_root(self, root: LibraryRoot) -> LibraryRoot:
+        """Persist a new storage root folder."""
+        self.session.add(root)
+        self.session.flush()
+        return root
+
+    def get_root_by_id(self, root_id: int) -> LibraryRoot | None:
+        """Fetch storage root by ID."""
+        return self.session.get(LibraryRoot, root_id)
+
+    def get_root_by_path(self, mount_path: str) -> LibraryRoot | None:
+        """Fetch storage root by mount path."""
+        stmt = select(LibraryRoot).where(LibraryRoot.mount_path == mount_path)
+        return self.session.scalars(stmt).first()
+
+    def list_roots_for_library(self, library_id: int) -> Sequence[LibraryRoot]:
+        """Fetch all roots belonging to a specific library."""
+        stmt = select(LibraryRoot).where(LibraryRoot.library_id == library_id).order_by(LibraryRoot.id.asc())
+        return self.session.scalars(stmt).all()
+
+    def delete_root(self, root: LibraryRoot) -> None:
+        """Delete a storage root folder."""
+        self.session.delete(root)
+        self.session.flush()
+
+    # -------------------------------------------------------------------------
+    # Scan Jobs Persistence
+    # -------------------------------------------------------------------------
+
+    def create_scan_job(self, job: ScanJob) -> ScanJob:
+        """Record a new filesystem scan execution."""
+        self.session.add(job)
+        self.session.flush()
+        return job
+
+    def get_scan_job_by_id(self, job_id: int) -> ScanJob | None:
+        """Retrieve scan job by ID."""
+        return self.session.get(ScanJob, job_id)
+
+    def list_scan_jobs(self, library_id: int | None = None, limit: int = 20) -> Sequence[ScanJob]:
+        """List recent scan jobs."""
+        stmt = select(ScanJob).order_by(ScanJob.started_at.desc()).limit(limit)
+        if library_id:
+            stmt = stmt.where(ScanJob.library_id == library_id)
+        return self.session.scalars(stmt).all()
+

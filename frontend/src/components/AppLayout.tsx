@@ -10,17 +10,20 @@ import {
   Disc,
   AlertTriangle,
   Plus,
+  FolderOpen,
 } from 'lucide-react';
 import { useStorageVolumes } from '../hooks/useStorageVolumes';
 import { useDownloadQueue } from '../hooks/useDownloadQueue';
 import { useWatchlistWorks } from '../hooks/usePersonalActions';
 import { AddWorkModal } from './AddWorkModal';
+import { ManageLibrariesModal } from './ManageLibrariesModal';
 
 export const AppLayout: React.FC<{
   searchQuery: string;
   setSearchQuery: (q: string) => void;
 }> = ({ searchQuery, setSearchQuery }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isManageLibrariesOpen, setIsManageLibrariesOpen] = useState(false);
   const { volumes, disconnectedVolumes, hasDisconnectedVolumes } = useStorageVolumes();
   const { speedMbps, activeCount } = useDownloadQueue();
   const { data: watchlistItems } = useWatchlistWorks();
@@ -95,6 +98,13 @@ export const AppLayout: React.FC<{
               <HardDrive className="w-3.5 h-3.5 text-shelf-amber" />
               وضعیت هاردها و دیسک‌ها
             </span>
+            <button
+              onClick={() => setIsManageLibrariesOpen(true)}
+              className="p-1 hover:text-shelf-amber transition rounded text-slate-400 hover:text-slate-200"
+              title="مدیریت کتابخانه‌ها و ریشه‌ها"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           <div className="space-y-2.5">
@@ -177,6 +187,16 @@ export const AppLayout: React.FC<{
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Manage Libraries Button */}
+            <button
+              onClick={() => setIsManageLibrariesOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-shelf-border font-medium text-xs transition"
+              title="مدیریت و اسکن ریشه‌های ذخیره‌سازی"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-shelf-amber" />
+              <span>مدیریت کتابخانه‌ها</span>
+            </button>
+
             {/* Add Movie / TMDB Search Button */}
             <button
               onClick={() => setIsAddModalOpen(true)}
@@ -224,6 +244,12 @@ export const AppLayout: React.FC<{
           <Outlet />
         </main>
       </div>
+
+      {/* Manage Libraries Modal */}
+      <ManageLibrariesModal
+        isOpen={isManageLibrariesOpen}
+        onClose={() => setIsManageLibrariesOpen(false)}
+      />
 
       {/* Add Work Modal */}
       <AddWorkModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />

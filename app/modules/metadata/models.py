@@ -22,7 +22,7 @@ from app.core.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.modules.integrations.models import ExternalItemMapping
-    from app.modules.library.models import LibraryItem
+    from app.modules.library.models import LibraryItem, LibraryMembership
     from app.modules.personal.models import PersonalRecord, ShelfItem, WatchDiaryLog
     from app.modules.playback.models import PlaybackProgress
     from app.modules.sources.models import SourceRelease
@@ -115,6 +115,11 @@ class MediaWork(Base, TimestampMixin):
         "LibraryItem",
         back_populates="work",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+    library_memberships: Mapped[list["LibraryMembership"]] = relationship(
+        "LibraryMembership",
+        back_populates="work",
         cascade="all, delete-orphan",
     )
     source_releases: Mapped[list["SourceRelease"]] = relationship(
