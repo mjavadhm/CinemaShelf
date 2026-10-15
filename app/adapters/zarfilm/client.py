@@ -112,10 +112,21 @@ class ZarfilmPort(Protocol):
         """Extract available download releases from a movie page."""
         ...
 
+    def match_card(
+        self,
+        cards: list[ZarfilmMovieCard],
+        title: str,
+        year: int | str | None = None,
+        llm_verifier: Any | None = None,
+    ) -> ZarfilmMovieCard | None:
+        """Find the closest matching card among search results."""
+        ...
+
     def search_and_extract(
         self,
         title: str,
         year: int | str | None = None,
+        llm_verifier: Any | None = None,
     ) -> tuple[str | None, list[ZarfilmReleaseCandidate]]:
         """Search for a movie, find the best matching card, and extract its releases."""
         ...
@@ -134,6 +145,9 @@ class ZarfilmPort(Protocol):
         releases: list[ZarfilmReleaseCandidate],
         preferred_quality: str = "1080p",
         prefer_x265: bool = True,
+        llm_selector: Any | None = None,
+        title: str = "",
+        year: int | str | None = None,
     ) -> ZarfilmReleaseCandidate | None:
         """Pick the highest scoring release from candidate options."""
         ...
@@ -229,10 +243,36 @@ class ZarfilmBrowserClient:
         cards: list[ZarfilmMovieCard],
         title: str,
         year: int | str | None = None,
+        llm_verifier: Any | None = None,
     ) -> ZarfilmMovieCard | None:
-        """Find best matching movie card from list of cards."""
+        """Find best matching movie card from list of cards, optionally using LLM verifier."""
         if not cards:
             return None
+
+        # 0. Try LLM verifier if provided
+        if callable(llm_verifier):
+            try:
+                card_dicts = [
+                    {
+                        "index": idx,
+                        "title": c.title,
+                        "year": c.year,
+                        "href": c.href,
+                        "imdb_rating": c.imdb_rating,
+                        "genres": c.genres,
+                        "plot": c.plot,
+                    }
+                    for idx, c in enumerate(cards)
+                ]
+                idx, reason = llm_verifier(title, year, card_dicts)
+                if idx is not None and 0 <= idx < len(cards):
+                    logger.info("LLM verified movie card index %d for '%s' (%s): %s", idx, title, year, reason)
+                    return cards[idx]
+                if idx == -1:
+                    logger.info("LLM explicitly verified that no card matches '%s' (%s): %s", title, year, reason)
+                    return None
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("LLM verifier failed, falling back to heuristic: %s", exc)
 
         title_clean = title.strip().lower()
         year_str = str(year).strip() if year is not None else None
@@ -334,10 +374,11 @@ class ZarfilmBrowserClient:
         self,
         title: str,
         year: int | str | None = None,
+        llm_verifier: Any | None = None,
     ) -> tuple[str | None, list[ZarfilmReleaseCandidate]]:
         """Search for movie on Zarfilm, select best match card, and extract all releases."""
         cards = self.search_cards(title, year)
-        matched = self.match_card(cards, title, year)
+        matched = self.match_card(cards, title, year, llm_verifier=llm_verifier)
         if not matched:
             logger.warning(
                 "No matching movie card found on Zarfilm for '%s' (%s)", title, year
@@ -380,10 +421,37 @@ class ZarfilmBrowserClient:
         releases: list[ZarfilmReleaseCandidate],
         preferred_quality: str = "1080p",
         prefer_x265: bool = True,
+        llm_selector: Any | None = None,
+        title: str = "",
+        year: int | str | None = None,
     ) -> ZarfilmReleaseCandidate | None:
-        """Return the highest scoring release from candidates."""
+        """Return the highest scoring release from candidates, optionally using LLM selector."""
         if not releases:
             return None
+
+        if callable(llm_selector):
+            try:
+                candidate_dicts = [
+                    {
+                        "quality_label": r.quality_label,
+                        "resolution": r.resolution,
+                        "encoder": r.encoder,
+                        "size_text": r.size_text,
+                        "is_dubbed": r.is_dubbed,
+                        "has_persian_sub": r.has_persian_sub,
+                        "is_x265": r.is_x265,
+                        "href": r.download_url,
+                        "section_type": "SoftSub" if r.has_persian_sub else ("Dubbed" if r.is_dubbed else "Standard"),
+                    }
+                    for r in releases
+                ]
+                pref_prompt = f"Preferred quality: {preferred_quality}, prefer x265/HEVC: {prefer_x265}"
+                idx, reason = llm_selector(title, year, candidate_dicts, pref_prompt)
+                if idx is not None and 0 <= idx < len(releases):
+                    logger.info("LLM selected release index %d for '%s': %s", idx, title, reason)
+                    return releases[idx]
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("LLM release selector failed, falling back to heuristic: %s", exc)
 
         # Prefer non-dubbed softsub releases if any exist
         softsub_candidates = [

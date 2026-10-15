@@ -1,6 +1,8 @@
 import { apiClient } from './client';
 import {
   Aria2Stats,
+  CategorizeRequest,
+  CategorizeResponse,
   DirectoryBrowseResponse,
   DownloadTask,
   ExternalSearchResult,
@@ -9,6 +11,13 @@ import {
   Library,
   LibraryItem,
   LibraryRoot,
+  LibraryStatsResponse,
+  LLMModel,
+  LLMProvider,
+  LLMRemoteDiscoveredModel,
+  LLMTestPromptRequest,
+  LLMTestPromptResponse,
+  LLMUsageSummary,
   MediaFile,
   MediaWorkDetail,
   MediaWorkSummary,
@@ -493,4 +502,146 @@ export async function browseServerDirectories(
   );
   return response.data;
 }
+
+// -----------------------------------------------------------------------------
+// Library Analytics & Categorization
+// -----------------------------------------------------------------------------
+
+export async function getLibraryStats(
+  libraryId?: number
+): Promise<LibraryStatsResponse> {
+  const response = await apiClient.get<LibraryStatsResponse>('/library/stats', {
+    params: libraryId ? { library_id: libraryId } : undefined,
+  });
+  return response.data;
+}
+
+export async function categorizeLibrary(
+  payload: CategorizeRequest
+): Promise<CategorizeResponse> {
+  const response = await apiClient.post<CategorizeResponse>(
+    '/library/categorize',
+    payload
+  );
+  return response.data;
+}
+
+// -----------------------------------------------------------------------------
+// LLM Router & Token Cost Tracking
+// -----------------------------------------------------------------------------
+
+export async function getLLMProviders(): Promise<LLMProvider[]> {
+  const response = await apiClient.get<LLMProvider[]>('/llm/providers');
+  return response.data;
+}
+
+export async function getLLMProvider(id: number): Promise<LLMProvider> {
+  const response = await apiClient.get<LLMProvider>(`/llm/providers/${id}`);
+  return response.data;
+}
+
+export async function createLLMProvider(
+  payload: {
+    name: string;
+    base_url: string;
+    api_key?: string | null;
+    is_enabled?: boolean;
+    priority?: number;
+  }
+): Promise<LLMProvider> {
+  const response = await apiClient.post<LLMProvider>('/llm/providers', payload);
+  return response.data;
+}
+
+export async function updateLLMProvider(
+  id: number,
+  payload: Partial<{
+    name: string;
+    base_url: string;
+    api_key: string;
+    is_enabled: boolean;
+    priority: number;
+  }>
+): Promise<LLMProvider> {
+  const response = await apiClient.patch<LLMProvider>(
+    `/llm/providers/${id}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function deleteLLMProvider(id: number): Promise<void> {
+  await apiClient.delete(`/llm/providers/${id}`);
+}
+
+export async function getLLMModels(
+  providerId?: number
+): Promise<LLMModel[]> {
+  const response = await apiClient.get<LLMModel[]>('/llm/models', {
+    params: providerId ? { provider_id: providerId } : undefined,
+  });
+  return response.data;
+}
+
+export async function createLLMModel(
+  payload: {
+    provider_id: number;
+    model_name: string;
+    display_name?: string | null;
+    input_price_per_1m?: number;
+    output_price_per_1m?: number;
+    is_enabled?: boolean;
+    priority?: number;
+  }
+): Promise<LLMModel> {
+  const response = await apiClient.post<LLMModel>('/llm/models', payload);
+  return response.data;
+}
+
+export async function updateLLMModel(
+  id: number,
+  payload: Partial<{
+    display_name: string;
+    input_price_per_1m: number;
+    output_price_per_1m: number;
+    is_enabled: boolean;
+    priority: number;
+  }>
+): Promise<LLMModel> {
+  const response = await apiClient.patch<LLMModel>(`/llm/models/${id}`, payload);
+  return response.data;
+}
+
+export async function deleteLLMModel(id: number): Promise<void> {
+  await apiClient.delete(`/llm/models/${id}`);
+}
+
+export async function discoverRemoteLLMModels(
+  providerId: number
+): Promise<LLMRemoteDiscoveredModel[]> {
+  const response = await apiClient.get<LLMRemoteDiscoveredModel[]>(
+    `/llm/providers/${providerId}/remote-models`
+  );
+  return response.data;
+}
+
+export async function getLLMUsageSummary(
+  limit: number = 20
+): Promise<LLMUsageSummary> {
+  const response = await apiClient.get<LLMUsageSummary>('/llm/usage', {
+    params: { limit },
+  });
+  return response.data;
+}
+
+export async function testLLMPrompt(
+  payload: LLMTestPromptRequest
+): Promise<LLMTestPromptResponse> {
+  const response = await apiClient.post<LLMTestPromptResponse>(
+    '/llm/test',
+    payload
+  );
+  return response.data;
+}
+
 

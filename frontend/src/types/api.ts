@@ -342,3 +342,113 @@ export function getTmdbImageUrl(
   const clean = path.startsWith('/') ? path : `/${path}`;
   return `https://image.tmdb.org/t/p/${size}${clean}`;
 }
+
+// -----------------------------------------------------------------------------
+// Library Analytics & Categorization
+// -----------------------------------------------------------------------------
+
+export interface LibraryStatsResponse {
+  total_movies: number;
+  total_files: number;
+  total_size_bytes: number;
+  average_rating: number;
+  top_directors: Array<{ name: string; count: number }>;
+  decade_distribution: Record<string, number>;
+  genre_distribution: Record<string, number>;
+  oldest_movie: { id: number; title: string; release_year: number } | null;
+  newest_movie: { id: number; title: string; release_year: number } | null;
+}
+
+export interface CategorizeRequest {
+  library_id?: number;
+  destination_dir: string;
+  by_director?: boolean;
+  by_rating?: boolean;
+  by_decade?: boolean;
+  director_min_count?: number;
+}
+
+export interface CategorizeResponse {
+  shortcuts_created: number;
+  categories: string[];
+  destination_path: string;
+}
+
+// -----------------------------------------------------------------------------
+// LLM Router & Cost Tracking
+// -----------------------------------------------------------------------------
+
+export interface LLMModel {
+  id: number;
+  provider_id: number;
+  model_name: string;
+  display_name?: string | null;
+  input_price_per_1m: number;
+  output_price_per_1m: number;
+  is_enabled: boolean;
+  priority: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface LLMProvider {
+  id: number;
+  name: string;
+  base_url: string;
+  api_key?: string | null;
+  api_key_masked?: string | null;
+  is_enabled: boolean;
+  priority: number;
+  models: LLMModel[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface LLMRemoteDiscoveredModel {
+  id: string;
+  name: string;
+  in_price_1m: number;
+  out_price_1m: number;
+}
+
+export interface LLMUsageLog {
+  id: number;
+  agent_type: string;
+  provider_name: string;
+  model_name: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+  success: boolean;
+  error_message?: string | null;
+  created_at: string;
+}
+
+export interface LLMUsageSummary {
+  total_calls: number;
+  successful_calls: number;
+  failed_calls: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_cost_usd: number;
+  recent_logs: LLMUsageLog[];
+}
+
+export interface LLMTestPromptRequest {
+  provider_id?: number | null;
+  model_id?: number | null;
+  system_prompt?: string;
+  user_prompt: string;
+}
+
+export interface LLMTestPromptResponse {
+  success: boolean;
+  provider_name: string;
+  model_name: string;
+  response_content?: string | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+  error_message?: string | null;
+}
+

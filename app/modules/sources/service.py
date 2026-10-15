@@ -60,10 +60,20 @@ class SourcesService:
                 status_code=404,
             )
 
+        llm_verifier = None
+        try:
+            from app.modules.llm.service import LLMService
+
+            llm_service = LLMService(self.session)
+            llm_verifier = llm_service.verify_or_select_movie
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("LLM verifier unavailable, skipping: %s", exc)
+
         try:
             page_url, candidates = self.zarfilm.search_and_extract(
                 title=work.title,
                 year=work.release_year,
+                llm_verifier=llm_verifier,
             )
         except Exception as exc:
             logger.error("Error during Zarfilm scrape for work %d: %s", work_id, exc)

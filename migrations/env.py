@@ -7,6 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 import app.modules.integrations.models
 import app.modules.library.models
+import app.modules.llm.models
 import app.modules.metadata.models
 import app.modules.personal.models
 import app.modules.playback.models

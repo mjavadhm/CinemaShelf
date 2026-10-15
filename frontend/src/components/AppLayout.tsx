@@ -11,12 +11,16 @@ import {
   AlertTriangle,
   Plus,
   FolderOpen,
+  BarChart2,
+  Brain,
 } from 'lucide-react';
 import { useStorageVolumes } from '../hooks/useStorageVolumes';
 import { useDownloadQueue } from '../hooks/useDownloadQueue';
 import { useWatchlistWorks } from '../hooks/usePersonalActions';
 import { AddWorkModal } from './AddWorkModal';
 import { ManageLibrariesModal } from './ManageLibrariesModal';
+import { AnalyticsAndShortcutsModal } from './AnalyticsAndShortcutsModal';
+import { LLMSettingsModal } from './LLMSettingsModal';
 
 export const AppLayout: React.FC<{
   searchQuery: string;
@@ -24,6 +28,8 @@ export const AppLayout: React.FC<{
 }> = ({ searchQuery, setSearchQuery }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isManageLibrariesOpen, setIsManageLibrariesOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isLLMSettingsOpen, setIsLLMSettingsOpen] = useState(false);
   const { volumes, disconnectedVolumes, hasDisconnectedVolumes } = useStorageVolumes();
   const { speedMbps, activeCount, isOnline } = useDownloadQueue();
   const { data: watchlistItems } = useWatchlistWorks();
@@ -89,6 +95,25 @@ export const AppLayout: React.FC<{
               );
             })}
           </nav>
+
+          {/* Advanced Tools */}
+          <div className="space-y-1 pt-2 border-t border-shelf-border/60">
+            <p className="px-3 text-[11px] font-semibold text-slate-500 uppercase">ابزارهای پیشرفته</p>
+            <button
+              onClick={() => setIsAnalyticsOpen(true)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition"
+            >
+              <BarChart2 className="w-4 h-4 text-shelf-amber shrink-0" />
+              <span>آنالیز و میانبرها</span>
+            </button>
+            <button
+              onClick={() => setIsLLMSettingsOpen(true)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition"
+            >
+              <Brain className="w-4 h-4 text-purple-400 shrink-0" />
+              <span>هوش مصنوعی و مدل‌ها</span>
+            </button>
+          </div>
         </div>
 
         {/* Storage Drives Status Widget */}
@@ -261,6 +286,18 @@ export const AppLayout: React.FC<{
 
       {/* Add Work Modal */}
       <AddWorkModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+
+      {/* Analytics & Virtual Shortcuts Modal */}
+      <AnalyticsAndShortcutsModal
+        isOpen={isAnalyticsOpen}
+        onClose={() => setIsAnalyticsOpen(false)}
+      />
+
+      {/* LLM Router & Token Cost Audit Modal */}
+      <LLMSettingsModal
+        isOpen={isLLMSettingsOpen}
+        onClose={() => setIsLLMSettingsOpen(false)}
+      />
     </div>
   );
 };
