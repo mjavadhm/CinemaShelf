@@ -75,6 +75,7 @@ def get_aria2_stats(
     try:
         stats = service.get_aria2_stats()
         return Aria2StatsResponse(
+            is_online=True,
             download_speed=stats.download_speed,
             upload_speed=stats.upload_speed,
             num_active=stats.num_active,
@@ -83,6 +84,7 @@ def get_aria2_stats(
         )
     except Exception:
         return Aria2StatsResponse(
+            is_online=False,
             download_speed=0,
             upload_speed=0,
             num_active=0,

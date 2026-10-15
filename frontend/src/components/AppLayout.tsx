@@ -25,7 +25,7 @@ export const AppLayout: React.FC<{
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isManageLibrariesOpen, setIsManageLibrariesOpen] = useState(false);
   const { volumes, disconnectedVolumes, hasDisconnectedVolumes } = useStorageVolumes();
-  const { speedMbps, activeCount } = useDownloadQueue();
+  const { speedMbps, activeCount, isOnline } = useDownloadQueue();
   const { data: watchlistItems } = useWatchlistWorks();
 
   const watchlistCount = watchlistItems?.length || 0;
@@ -213,12 +213,20 @@ export const AppLayout: React.FC<{
 
             <NavLink
               to="/watchlist"
-              className="flex items-center gap-2 text-xs bg-shelf-bg border border-shelf-border px-3 py-1.5 rounded-lg font-mono hover:border-slate-600 transition"
+              className={`flex items-center gap-2 text-xs border px-3 py-1.5 rounded-lg font-mono transition ${
+                !isOnline
+                  ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:border-red-500/50'
+                  : 'bg-shelf-bg border-shelf-border hover:border-slate-600'
+              }`}
               dir="ltr"
             >
-              <Download className="w-3.5 h-3.5 text-shelf-amber" />
+              <Download
+                className={`w-3.5 h-3.5 ${!isOnline ? 'text-red-400' : 'text-shelf-amber'}`}
+              />
               <span>
-                Aria2: {speedMbps} MB/s {activeCount > 0 ? `(${activeCount})` : ''}
+                {!isOnline
+                  ? 'Aria2: آفلاین'
+                  : `Aria2: ${speedMbps} MB/s ${activeCount > 0 ? `(${activeCount})` : ''}`}
               </span>
             </NavLink>
           </div>

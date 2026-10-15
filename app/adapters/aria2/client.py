@@ -190,6 +190,9 @@ class Aria2Client:
 
     def start_local_daemon(self) -> bool:
         """Start local aria2c background daemon if executable exists."""
+        if self.is_daemon_running():
+            return True
+
         if not shutil.which("aria2c"):
             logger.warning("aria2c executable not found on system PATH")
             return False
@@ -220,9 +223,13 @@ class Aria2Client:
 
         try:
             subprocess.Popen(cmd)
-            time.sleep(1.0)
-            logger.info("Spawned local aria2c daemon on port %s", port)
-            return True
+            for _ in range(6):
+                time.sleep(0.5)
+                if self.is_daemon_running():
+                    logger.info("Spawned local aria2c daemon and verified RPC on port %s", port)
+                    return True
+            logger.warning("Aria2 daemon was launched but did not answer RPC on port %s", port)
+            return False
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to spawn aria2c process: %s", exc)
             return False

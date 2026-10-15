@@ -211,6 +211,7 @@ export interface DownloadTask {
 }
 
 export interface Aria2Stats {
+  is_online?: boolean;
   download_speed: number;
   upload_speed: number;
   num_active: number;

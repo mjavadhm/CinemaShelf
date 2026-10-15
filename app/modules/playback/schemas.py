@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict
 class FileAccessResponse(BaseModel):
     """Result of requesting an OS file or directory open action."""
 
-    media_file_id: int
-    work_id: int
+    media_file_id: int | None = None
+    work_id: int | None = None
     path: str
     action: str
     success: bool

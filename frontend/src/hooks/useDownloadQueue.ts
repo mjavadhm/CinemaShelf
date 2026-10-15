@@ -77,6 +77,7 @@ export function useDownloadQueue() {
   const speedMbps = stats ? (stats.download_speed / (1024 * 1024)).toFixed(1) : '0.0';
   const activeCount = stats?.num_active ?? tasks.filter((t) => t.status === 'ACTIVE').length;
   const queuedCount = stats?.num_waiting ?? tasks.filter((t) => t.status === 'QUEUED').length;
+  const isOnline = stats?.is_online ?? true;
 
   return {
     tasks,
@@ -84,6 +85,7 @@ export function useDownloadQueue() {
     speedMbps,
     activeCount,
     queuedCount,
+    isOnline,
     isLoading: tasksQuery.isLoading,
     isError: tasksQuery.isError,
     pauseTask: (id: number) => pauseMutation.mutateAsync(id),

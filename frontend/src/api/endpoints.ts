@@ -272,6 +272,13 @@ export async function openFileLocation(mediaFileId: number): Promise<FileAccessR
   return response.data;
 }
 
+export async function openDirectory(path: string): Promise<FileAccessResult> {
+  const response = await apiClient.post<FileAccessResult>('/playback/directories/open', null, {
+    params: { path },
+  });
+  return response.data;
+}
+
 export async function getWatchStatus(
   workId: number,
   episodeId?: number

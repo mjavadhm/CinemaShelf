@@ -127,6 +127,21 @@ class PlaybackService:
             success=success,
         )
 
+    def open_directory(self, directory_path: str) -> FileAccessResponse:
+        """Reveal a filesystem directory in the native OS file manager."""
+        target_dir = Path(directory_path).resolve()
+        if not target_dir.is_dir():
+            raise FileMissingError(f"Directory not found on disk: {target_dir}")
+
+        success = self.opener.open_folder(str(target_dir))
+        return FileAccessResponse(
+            media_file_id=None,
+            work_id=None,
+            path=str(target_dir),
+            action="open_directory",
+            success=success,
+        )
+
     def mark_watched(
         self, work_id: int, episode_id: int | None = None
     ) -> PlaybackProgress:

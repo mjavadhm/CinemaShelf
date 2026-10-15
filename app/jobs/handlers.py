@@ -106,6 +106,11 @@ def sync_active_downloads(session: Session, aria2: Aria2Port) -> int:
                         "Registered completed download as MediaFile: %s",
                         file_path_str,
                     )
+                    if (
+                        task.library_item
+                        and task.library_item.status != LibraryItemStatus.AVAILABLE
+                    ):
+                        task.library_item.status = LibraryItemStatus.AVAILABLE
                 except Exception as exc:  # noqa: BLE001
                     logger.warning(
                         "Could not auto-attach media file for task %d: %s",
@@ -113,12 +118,11 @@ def sync_active_downloads(session: Session, aria2: Aria2Port) -> int:
                         exc,
                     )
             else:
-                # Mark item available even if file on disk was not verified directly
-                if (
-                    task.library_item
-                    and task.library_item.status != LibraryItemStatus.AVAILABLE
-                ):
-                    task.library_item.status = LibraryItemStatus.AVAILABLE
+                task.status = DownloadTaskStatus.ERROR
+                task.error_message = (
+                    f"Physical file missing on disk after Aria2 completion: {file_path_str}"
+                )
+                logger.error("DownloadTask %d file missing: %s", task.id, file_path_str)
 
             completed_count += 1
 

@@ -31,7 +31,7 @@ export const WatchlistDownloadsPage: React.FC = () => {
     refetch: refetchWatchlist,
   } = useWatchlistWorks();
   const { toggleWatchlist } = usePersonalActions();
-  const { openFileLocation } = usePlaybackLaunch();
+  const { openFileLocation, openDirectoryPath } = usePlaybackLaunch();
 
   const {
     tasks,
@@ -48,10 +48,12 @@ export const WatchlistDownloadsPage: React.FC = () => {
   } = useDownloadQueue();
 
   const handleOpenTaskFolder = async (destDir: string) => {
-    // If destination folder is known, we can call openFileLocation with a dummy or use service
-    // Note: If task has no media_file_id, we can notify or copy path
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(destDir);
+    try {
+      await openDirectoryPath(destDir);
+    } catch {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(destDir);
+      }
     }
   };
 
@@ -249,6 +251,11 @@ export const WatchlistDownloadsPage: React.FC = () => {
                         {task.destination_dir}
                       </span>
                     </div>
+                    {task.error_message && (
+                      <div className="text-[11px] text-red-400 font-mono bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded truncate" title={task.error_message}>
+                        خطا: {task.error_message}
+                      </div>
+                    )}
                   </div>
 
                   {/* Col 2: Progress Bar & Size (5 cols) */}

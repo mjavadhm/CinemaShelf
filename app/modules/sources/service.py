@@ -142,37 +142,38 @@ class SourcesService:
         dest_dir = request.destination_dir or str(self.settings.download_dir)
         Path(dest_dir).mkdir(parents=True, exist_ok=True)
 
-        aria2_gid: str | None = None
-        status = DownloadTaskStatus.QUEUED
+        task = DownloadTask(
+            library_item_id=request.library_item_id,
+            episode_id=request.episode_id,
+            release_id=request.release_id,
+            aria2_gid=None,
+            download_url=download_url,
+            destination_dir=dest_dir,
+            file_name=request.file_name,
+            status=DownloadTaskStatus.QUEUED,
+        )
+        self.repository.create_task(task)
 
         if start_immediately:
+            if not self.aria2.is_daemon_running():
+                self.aria2.start_local_daemon()
             try:
                 aria2_gid = self.aria2.add_uri(
                     url=download_url,
                     destination_dir=dest_dir,
                     file_name=request.file_name,
                 )
-                status = DownloadTaskStatus.ACTIVE
+                task.aria2_gid = aria2_gid
+                task.status = DownloadTaskStatus.ACTIVE
+                task.started_at = datetime.now(UTC)
             except Exception as exc:
                 logger.error("Failed to enqueue URI into Aria2: %s", exc)
+                task.status = DownloadTaskStatus.FAILED
+                task.error_message = str(exc)
+                self.session.commit()
                 raise ProviderUnavailableError(
                     f"Aria2 RPC error while adding task: {exc}"
                 ) from exc
-
-        task = DownloadTask(
-            library_item_id=request.library_item_id,
-            episode_id=request.episode_id,
-            release_id=request.release_id,
-            aria2_gid=aria2_gid,
-            download_url=download_url,
-            destination_dir=dest_dir,
-            file_name=request.file_name,
-            status=status,
-            started_at=datetime.now(UTC)
-            if status == DownloadTaskStatus.ACTIVE
-            else None,
-        )
-        self.repository.create_task(task)
 
         # Update library item status
         if library_item.status in (
@@ -214,10 +215,11 @@ class SourcesService:
         """Pause an active Aria2 download."""
         task = self.get_task(task_id)
         if task.aria2_gid:
-            try:
-                self.aria2.pause(task.aria2_gid)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Aria2 pause failed for GID %s: %s", task.aria2_gid, exc)
+            success = self.aria2.pause(task.aria2_gid)
+            if not success:
+                raise ProviderUnavailableError(
+                    f"Aria2 failed to pause download GID {task.aria2_gid}"
+                )
         task.status = DownloadTaskStatus.PAUSED
         self.session.commit()
         return task
@@ -226,15 +228,16 @@ class SourcesService:
         """Resume a paused download or start a queued task."""
         task = self.get_task(task_id)
         if task.aria2_gid:
-            try:
-                self.aria2.unpause(task.aria2_gid)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Aria2 unpause failed for GID %s: %s", task.aria2_gid, exc
+            success = self.aria2.unpause(task.aria2_gid)
+            if not success:
+                raise ProviderUnavailableError(
+                    f"Aria2 failed to resume download GID {task.aria2_gid}"
                 )
             task.status = DownloadTaskStatus.ACTIVE
         elif task.status == DownloadTaskStatus.QUEUED:
             # Start dispatching to Aria2
+            if not self.aria2.is_daemon_running():
+                self.aria2.start_local_daemon()
             try:
                 gid = self.aria2.add_uri(
                     url=task.download_url,
@@ -245,6 +248,9 @@ class SourcesService:
                 task.status = DownloadTaskStatus.ACTIVE
                 task.started_at = datetime.now(UTC)
             except Exception as exc:
+                task.status = DownloadTaskStatus.FAILED
+                task.error_message = str(exc)
+                self.session.commit()
                 raise ProviderUnavailableError(
                     f"Aria2 error starting queued task: {exc}"
                 ) from exc
@@ -256,12 +262,7 @@ class SourcesService:
         """Cancel and remove a download task."""
         task = self.get_task(task_id)
         if task.aria2_gid:
-            try:
-                self.aria2.remove(task.aria2_gid)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Aria2 remove failed for GID %s: %s", task.aria2_gid, exc
-                )
+            self.aria2.remove(task.aria2_gid)
         task.status = DownloadTaskStatus.REMOVED
         self.session.commit()
         return task

@@ -54,6 +54,15 @@ def open_file_location(
     return service.open_file_location(media_file_id=id)
 
 
+@router.post("/directories/open", response_model=FileAccessResponse)
+def open_directory(
+    path: Annotated[str, Query(description="Target directory path on host")],
+    service: Annotated[PlaybackService, Depends(get_playback_service)],
+) -> FileAccessResponse:
+    """Reveal a filesystem directory in the native OS file manager."""
+    return service.open_directory(directory_path=path)
+
+
 # --- Manual Watch Status Toggles ---
 
 

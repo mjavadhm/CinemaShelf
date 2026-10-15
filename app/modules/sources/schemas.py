@@ -88,6 +88,7 @@ class SpeedLimitRequest(BaseModel):
 class Aria2StatsResponse(BaseModel):
     """Aria2 daemon global stats representation."""
 
+    is_online: bool = True
     download_speed: int
     upload_speed: int
     num_active: int

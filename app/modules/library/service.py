@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import shutil
 from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -456,6 +457,32 @@ class LibraryService:
             roots=root_resps,
             movie_count=movie_count,
             created_at=lib.created_at,
+        )
+
+    def get_library_stats(self, library_id: int | None = None) -> dict[str, Any]:
+        """Compute aggregated statistics across library items."""
+        from app.modules.library.stats import calculate_library_stats
+
+        return calculate_library_stats(self.session, library_id=library_id)
+
+    def categorize_library(
+        self,
+        destination_path: str,
+        library_id: int | None = None,
+        by_director: bool = True,
+        by_rating: bool = True,
+        by_decade: bool = True,
+    ) -> dict[str, Any]:
+        """Generate virtual shortcut tree by director, rating, and decade."""
+        from app.modules.library.categorizer import categorize_library_items
+
+        return categorize_library_items(
+            session=self.session,
+            destination_path=destination_path,
+            library_id=library_id,
+            by_director=by_director,
+            by_rating=by_rating,
+            by_decade=by_decade,
         )
 
 

@@ -212,3 +212,50 @@ class DirectoryBrowseResponse(BaseModel):
     used_bytes: int | None = None
     free_bytes: int | None = None
 
+
+class DirectorStat(BaseModel):
+    """Director name and movie count in library."""
+
+    name: str
+    count: int
+
+
+class MovieSummaryStat(BaseModel):
+    """Minimal movie descriptor for statistics."""
+
+    id: int
+    title: str
+    release_year: int | None = None
+
+
+class LibraryStatsResponse(BaseModel):
+    """Aggregated analytics and counters across library items."""
+
+    total_movies: int
+    total_files: int
+    total_size_bytes: int
+    average_rating: float
+    top_directors: list[DirectorStat] = Field(default_factory=list)
+    decade_distribution: dict[str, int] = Field(default_factory=dict)
+    genre_distribution: dict[str, int] = Field(default_factory=dict)
+    oldest_movie: MovieSummaryStat | None = None
+    newest_movie: MovieSummaryStat | None = None
+
+
+class CategorizeRequest(BaseModel):
+    """Payload to generate virtual shortcut taxonomy."""
+
+    destination_path: str
+    library_id: int | None = None
+    by_director: bool = True
+    by_rating: bool = True
+    by_decade: bool = True
+
+
+class CategorizeResponse(BaseModel):
+    """Result of virtual shortcut organization."""
+
+    shortcuts_created: int
+    categories: list[str]
+    destination_path: str
+

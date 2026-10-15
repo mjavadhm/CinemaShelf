@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db_session
 from app.modules.library.models import LibraryItemStatus
 from app.modules.library.schemas import (
+    CategorizeRequest,
+    CategorizeResponse,
     DirectoryBrowseResponse,
     LibraryCreate,
     LibraryItemCreate,
@@ -17,6 +19,7 @@ from app.modules.library.schemas import (
     LibraryResponse,
     LibraryRootCreate,
     LibraryRootResponse,
+    LibraryStatsResponse,
     MediaFileCreate,
     MediaFileResponse,
     ScanJobResponse,
@@ -256,5 +259,39 @@ def browse_server_directories(
 ) -> DirectoryBrowseResponse:
     """Safely browse server directories for folder picker dialogs."""
     return service.browse_directories(path)
+
+
+@router.get(
+    "/stats",
+    response_model=LibraryStatsResponse,
+    summary="Get library statistics and analytics",
+)
+def get_library_statistics(
+    service: Annotated[LibraryService, Depends(get_library_service)],
+    library_id: Annotated[int | None, Query(description="Filter stats by library ID")] = None,
+) -> LibraryStatsResponse:
+    """Retrieve comprehensive analytics across cataloged library items."""
+    stats = service.get_library_stats(library_id=library_id)
+    return LibraryStatsResponse.model_validate(stats)
+
+
+@router.post(
+    "/categorize",
+    response_model=CategorizeResponse,
+    summary="Categorize library into virtual shortcut tree",
+)
+def categorize_library_shortcuts(
+    request: CategorizeRequest,
+    service: Annotated[LibraryService, Depends(get_library_service)],
+) -> CategorizeResponse:
+    """Generate categorized virtual shortcuts by director, rating, and decade."""
+    result = service.categorize_library(
+        destination_path=request.destination_path,
+        library_id=request.library_id,
+        by_director=request.by_director,
+        by_rating=request.by_rating,
+        by_decade=request.by_decade,
+    )
+    return CategorizeResponse.model_validate(result)
 
 
