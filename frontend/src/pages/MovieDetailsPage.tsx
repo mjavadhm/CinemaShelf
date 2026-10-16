@@ -15,7 +15,9 @@ import {
   ExternalLink,
   Search,
   Globe,
+  RefreshCw,
 } from 'lucide-react';
+import { RematchModal } from '../components/RematchModal';
 import { useWorkDetails } from '../hooks/useWorkDetails';
 import { usePersonalActions } from '../hooks/usePersonalActions';
 import { usePlaybackLaunch } from '../hooks/usePlaybackLaunch';
@@ -47,6 +49,7 @@ export const MovieDetailsPage: React.FC = () => {
   const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [isSubmittingToLetterboxd, setIsSubmittingToLetterboxd] = useState(false);
   const [letterboxdFeedback, setLetterboxdFeedback] = useState<string | null>(null);
+  const [isRematchOpen, setIsRematchOpen] = useState(false);
 
   const handleRateOnLetterboxd = async () => {
     if (!work) return;
@@ -373,6 +376,16 @@ export const MovieDetailsPage: React.FC = () => {
               )}
               <span>جستجوی لینک‌های دانلود (زرفیلم)</span>
             </button>
+
+            {/* Rematch Button */}
+            <button
+              onClick={() => setIsRematchOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-shelf-bg hover:bg-slate-800 text-rose-300 hover:text-rose-200 border border-shelf-border text-xs font-medium flex items-center gap-2 transition"
+              title="اگر فایل این فیلم اشتباهی شناسایی شده، می‌توانید فیلم صحیح را از TMDB انتخاب کنید"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>تصحیح تطابق فیلم (Rematch)</span>
+            </button>
           </div>
         </div>
       </div>
@@ -463,6 +476,14 @@ export const MovieDetailsPage: React.FC = () => {
             <HardDrive className="w-5 h-5 text-shelf-amber" />
             <span>مدیریت چندفایلی و نسخه‌های آرشیو ({mediaFiles.length} نسخه)</span>
           </h2>
+          <button
+            onClick={() => setIsRematchOpen(true)}
+            className="px-3 py-1.5 rounded-lg bg-shelf-card hover:bg-slate-800 text-rose-300 border border-shelf-border text-xs flex items-center gap-1.5 transition"
+            title="انتقال فایل‌های این فیلم به فیلم دیگر از TMDB"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>تصحیح فیلم (Rematch)</span>
+          </button>
         </div>
 
         {mediaFiles.length === 0 ? (
@@ -592,6 +613,17 @@ export const MovieDetailsPage: React.FC = () => {
           </div>
         </section>
       )}
+
+      {/* Rematch Modal */}
+      <RematchModal
+        isOpen={isRematchOpen}
+        onClose={() => setIsRematchOpen(false)}
+        workId={work.id}
+        libraryItemId={libraryItem?.id}
+        currentTitle={work.title}
+        currentYear={work.release_year}
+        mediaFilesCount={mediaFiles.length}
+      />
     </div>
   );
 };

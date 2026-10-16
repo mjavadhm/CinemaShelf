@@ -362,6 +362,18 @@ export const LetterboxdImportModal: React.FC<LetterboxdImportModalProps> = ({
                         )}
                       </button>
                     </div>
+
+                    {isSyncingBrowser && (
+                      <div className="p-3 rounded-lg bg-shelf-amber/10 border border-shelf-amber/30 text-shelf-amber text-xs flex items-start gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-bold">مرورگر در حال استخراج صفحات است...</p>
+                          <p className="text-[11px] text-slate-300">
+                            پیمایش چند صفحه‌ای فیلم‌ها و واچ‌لیست به صورت دسته‌ای انجام می‌شود و ممکن است ۱ تا ۲ دقیقه زمان ببرد. لطفاً پنجره را نبندید.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

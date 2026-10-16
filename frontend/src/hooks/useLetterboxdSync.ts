@@ -29,6 +29,8 @@ export function useLetterboxdSync() {
       queryClient.invalidateQueries({ queryKey: ['sync-runs'] });
       queryClient.invalidateQueries({ queryKey: ['library-items'] });
       queryClient.invalidateQueries({ queryKey: ['watchlist-works'] });
+      queryClient.invalidateQueries({ queryKey: ['personal-record'] });
+      queryClient.invalidateQueries({ queryKey: ['work-details'] });
     },
   });
 
@@ -46,6 +48,8 @@ export function useLetterboxdSync() {
       queryClient.invalidateQueries({ queryKey: ['sync-runs'] });
       queryClient.invalidateQueries({ queryKey: ['library-items'] });
       queryClient.invalidateQueries({ queryKey: ['watchlist-works'] });
+      queryClient.invalidateQueries({ queryKey: ['personal-record'] });
+      queryClient.invalidateQueries({ queryKey: ['work-details'] });
     },
   });
 
@@ -74,6 +78,8 @@ export function useLetterboxdSync() {
       queryClient.invalidateQueries({ queryKey: ['sync-runs'] });
       queryClient.invalidateQueries({ queryKey: ['library-items'] });
       queryClient.invalidateQueries({ queryKey: ['watchlist-works'] });
+      queryClient.invalidateQueries({ queryKey: ['personal-record'] });
+      queryClient.invalidateQueries({ queryKey: ['work-details'] });
     },
   });
 

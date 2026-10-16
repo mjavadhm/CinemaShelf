@@ -37,6 +37,7 @@ from app.modules.library.schemas import (
     StorageDriveShortcut,
     StorageVolumeResponse,
 )
+from app.modules.metadata.models import WorkType
 from app.modules.metadata.service import MetadataService
 
 
@@ -197,6 +198,78 @@ class LibraryService:
                 status_code=404,
             )
         return item
+
+    async def rematch_item(
+        self,
+        item_id: int,
+        target_tmdb_id: int,
+        work_type: WorkType = WorkType.MOVIE,
+    ) -> LibraryItem:
+        """Rematch a LibraryItem and its associated media files to a different MediaWork."""
+        item = self.get_item(item_id)
+
+        target_work = await self.metadata_service.get_or_ingest_work(
+            tmdb_id=target_tmdb_id,
+            work_type=work_type,
+        )
+
+        old_work_id = item.work_id
+        if old_work_id == target_work.id:
+            return item
+
+        # Check if target work already has a LibraryItem
+        existing_target_item = self.repository.get_item_by_work_id(target_work.id)
+
+        if existing_target_item is not None and existing_target_item.id != item.id:
+            # Move all media files to the existing target item
+            for mf in list(item.media_files):
+                mf.library_item_id = existing_target_item.id
+
+            if existing_target_item.status in (LibraryItemStatus.WANTED, LibraryItemStatus.DOWNLOADING):
+                existing_target_item.status = LibraryItemStatus.AVAILABLE
+
+            self.session.flush()
+            self.session.delete(item)
+            self.session.commit()
+            return self.get_item(existing_target_item.id)
+
+        # Otherwise, change this item's work_id to target_work.id
+        item.work_id = target_work.id
+
+        # Update LibraryMembership records
+        from app.modules.library.models import LibraryMembership
+        from sqlalchemy import select
+
+        memberships = self.session.scalars(
+            select(LibraryMembership).where(LibraryMembership.work_id == old_work_id)
+        ).all()
+        for m in memberships:
+            existing_m = self.session.scalars(
+                select(LibraryMembership).where(
+                    LibraryMembership.library_id == m.library_id,
+                    LibraryMembership.work_id == target_work.id,
+                )
+            ).first()
+            if not existing_m:
+                m.work_id = target_work.id
+            else:
+                self.session.delete(m)
+
+        # Transfer personal record if target doesn't have one
+        from app.modules.personal.models import PersonalRecord
+
+        old_pr = self.session.scalars(
+            select(PersonalRecord).where(PersonalRecord.work_id == old_work_id)
+        ).first()
+        target_pr = self.session.scalars(
+            select(PersonalRecord).where(PersonalRecord.work_id == target_work.id)
+        ).first()
+
+        if old_pr and not target_pr:
+            old_pr.work_id = target_work.id
+
+        self.session.commit()
+        return self.get_item(item.id)
 
     @staticmethod
     def _discover_system_drives() -> list[StorageDriveShortcut]:

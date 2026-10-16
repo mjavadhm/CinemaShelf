@@ -88,6 +88,13 @@ class LibraryItemStatusUpdate(BaseModel):
     status: LibraryItemStatus
 
 
+class RematchLibraryItemRequest(BaseModel):
+    """Schema for rematching a library item to a different movie or show."""
+
+    tmdb_id: int = Field(..., description="Target TMDB ID to rematch to")
+    work_type: WorkType = Field(default=WorkType.MOVIE, description="Work type (MOVIE or SHOW)")
+
+
 class LibraryItemSummaryResponse(BaseModel):
     """Summary of a library item for listings."""
 

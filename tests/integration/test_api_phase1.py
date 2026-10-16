@@ -176,3 +176,54 @@ def test_full_library_crud_lifecycle(client: TestClient) -> None:
 
     # Confirm 404
     assert client.get(f"/library/items/{item_id}").status_code == 404
+
+
+def test_rematch_library_item_endpoint(client: TestClient, mock_provider: AsyncMock) -> None:
+    """Verify rematching a library item re-identifies work and transfers files."""
+    # Mocking target details for another film
+    mock_provider.fetch_details.return_value = ExternalWorkDetails(
+        tmdb_id=27205,
+        work_type="MOVIE",
+        title="Inception",
+        release_date=date(2010, 7, 16),
+        release_year=2010,
+        genres=[],
+        credits=[],
+    )
+
+    # Ingest original work (157336) and add to library
+    ingest_resp = client.post("/metadata/ingest", json={"tmdb_id": 157336, "work_type": "MOVIE"})
+    work_id = ingest_resp.json()["id"]
+
+    lib_resp = client.post("/library/items", json={"work_id": work_id, "status": "WANTED"})
+    item_id = lib_resp.json()["id"]
+
+    # Attach file
+    client.post(
+        f"/library/items/{item_id}/files",
+        json={
+            "file_path": "/media/movies/movie.mkv",
+            "file_name": "movie.mkv",
+            "resolution": "1080p",
+        },
+    )
+
+    # Call rematch endpoint
+    rematch_resp = client.post(
+        f"/library/items/{item_id}/rematch",
+        json={"tmdb_id": 27205, "work_type": "MOVIE"},
+    )
+    assert rematch_resp.status_code == 200
+    rematch_data = rematch_resp.json()
+    assert rematch_data["work"]["title"] == "Inception"
+    assert rematch_data["work"]["release_year"] == 2010
+    assert len(rematch_data["media_files"]) == 1
+    assert rematch_data["media_files"][0]["file_name"] == "movie.mkv"
+
+    # Also test by-work rematch endpoint
+    by_work_resp = client.post(
+        f"/library/by-work/{rematch_data['work_id']}/rematch",
+        json={"tmdb_id": 27205, "work_type": "MOVIE"},
+    )
+    assert by_work_resp.status_code == 200
+    assert by_work_resp.json()["work"]["title"] == "Inception"

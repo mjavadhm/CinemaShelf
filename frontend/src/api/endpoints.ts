@@ -108,6 +108,36 @@ export async function updateLibraryItemStatus(
   return response.data;
 }
 
+export async function rematchLibraryItem(
+  itemId: number,
+  tmdbId: number,
+  workType: WorkType = 'MOVIE'
+): Promise<LibraryItem> {
+  const response = await apiClient.post<LibraryItem>(
+    `/library/items/${itemId}/rematch`,
+    {
+      tmdb_id: tmdbId,
+      work_type: workType,
+    }
+  );
+  return response.data;
+}
+
+export async function rematchByWorkId(
+  workId: number,
+  tmdbId: number,
+  workType: WorkType = 'MOVIE'
+): Promise<LibraryItem> {
+  const response = await apiClient.post<LibraryItem>(
+    `/library/by-work/${workId}/rematch`,
+    {
+      tmdb_id: tmdbId,
+      work_type: workType,
+    }
+  );
+  return response.data;
+}
+
 export async function attachMediaFile(
   itemId: number,
   fileData: {
@@ -440,6 +470,7 @@ export async function importLetterboxdFile(
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 600000,
     }
   );
   return response.data;
@@ -466,6 +497,9 @@ export async function syncLetterboxdLocalHtml(
       folder_path: folderPath,
       conflict_policy: conflictPolicy,
       scale_mode: scaleMode,
+    },
+    {
+      timeout: 600000,
     }
   );
   return response.data;
@@ -486,6 +520,9 @@ export async function syncLetterboxdViaBrowser(
       max_pages: maxPages,
       conflict_policy: conflictPolicy,
       scale_mode: scaleMode,
+    },
+    {
+      timeout: 600000,
     }
   );
   return response.data;

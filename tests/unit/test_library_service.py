@@ -146,3 +146,41 @@ async def test_attach_duplicate_file_path_raises_conflict(
         service.attach_media_file(item.id, file_req)
     assert exc_info.value.status_code == 409
     assert exc_info.value.code == "duplicate_file_path"
+
+
+@pytest.mark.asyncio
+async def test_rematch_item_transfers_files(
+    db_session: Session, test_work: MediaWork
+) -> None:
+    """Verify rematching an item updates work and transfers physical files cleanly."""
+    mock_provider = AsyncMock(spec=MetadataProvidersPort)
+    mock_provider.fetch_details.return_value = ExternalWorkDetails(
+        tmdb_id=27205,
+        work_type="MOVIE",
+        title="Inception",
+        release_date=date(2010, 7, 16),
+        release_year=2010,
+        genres=[],
+        credits=[],
+    )
+    meta_service = MetadataService(session=db_session, provider=mock_provider)
+    service = LibraryService(session=db_session, metadata_service=meta_service)
+
+    # Add initial work (The Matrix)
+    req = LibraryItemCreate(work_id=test_work.id, status=LibraryItemStatus.WANTED)
+    item = await service.add_to_library(req)
+
+    # Attach file
+    file_req = MediaFileCreate(
+        file_path="/media/movies/Inception.2010.mkv",
+        file_name="Inception.2010.mkv",
+        resolution="1080p",
+    )
+    service.attach_media_file(item.id, file_req)
+
+    # Rematch to Inception
+    rematched = await service.rematch_item(item.id, target_tmdb_id=27205)
+    assert rematched.work.title == "Inception"
+    assert rematched.work.release_year == 2010
+    assert len(rematched.media_files) == 1
+    assert rematched.media_files[0].file_name == "Inception.2010.mkv"

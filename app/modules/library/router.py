@@ -22,6 +22,7 @@ from app.modules.library.schemas import (
     LibraryStatsResponse,
     MediaFileCreate,
     MediaFileResponse,
+    RematchLibraryItemRequest,
     ScanJobResponse,
     StorageVolumeResponse,
 )
@@ -154,6 +155,47 @@ def get_library_item_by_work(
     """Retrieve library item and files corresponding to a MediaWork ID."""
     item = service.get_item_by_work_id(work_id)
     return LibraryItemDetailResponse.model_validate(item)
+
+
+@router.post(
+    "/items/{id}/rematch",
+    response_model=LibraryItemDetailResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Rematch a library item and its media files to a different movie or show",
+)
+async def rematch_library_item(
+    id: int,
+    request: RematchLibraryItemRequest,
+    service: Annotated[LibraryService, Depends(get_library_service)],
+) -> LibraryItemDetailResponse:
+    """Re-identify a library item to a new TMDB ID, transferring associated physical media files."""
+    updated = await service.rematch_item(
+        item_id=id,
+        target_tmdb_id=request.tmdb_id,
+        work_type=request.work_type,
+    )
+    return LibraryItemDetailResponse.model_validate(updated)
+
+
+@router.post(
+    "/by-work/{work_id}/rematch",
+    response_model=LibraryItemDetailResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Rematch by work ID to a different movie or show",
+)
+async def rematch_by_work_id(
+    work_id: int,
+    request: RematchLibraryItemRequest,
+    service: Annotated[LibraryService, Depends(get_library_service)],
+) -> LibraryItemDetailResponse:
+    """Find library item by current work ID and rematch to target TMDB work."""
+    item = service.get_item_by_work_id(work_id)
+    updated = await service.rematch_item(
+        item_id=item.id,
+        target_tmdb_id=request.tmdb_id,
+        work_type=request.work_type,
+    )
+    return LibraryItemDetailResponse.model_validate(updated)
 
 
 @router.get("/volumes", response_model=list[StorageVolumeResponse])

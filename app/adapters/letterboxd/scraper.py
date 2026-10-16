@@ -102,9 +102,8 @@ class LetterboxdBrowserScraper(LetterboxdScraperPort):
             while current_url and page_num <= max_pages:
                 logger.info("Scraping Letterboxd films page %d: %s", page_num, current_url)
                 page.get(current_url)
-                # Wait for posters to load
                 try:
-                    page.wait.eles_loaded("css:li.griditem, div[data-component-class='LazyPoster']", timeout=8)
+                    page.wait.eles_loaded("css:li.griditem, div[data-component-class='LazyPoster']", timeout=3)
                 except Exception:
                     logger.debug("Timeout waiting for grid items on page %d", page_num)
 
@@ -114,6 +113,11 @@ class LetterboxdBrowserScraper(LetterboxdScraperPort):
                     default_type=LetterboxdItemType.WATCHED,
                 )
                 logger.info("Parsed %d films from page %d", len(items), page_num)
+
+                if not items:
+                    logger.info("No more films found on page %d, ending pagination.", page_num)
+                    break
+
                 all_items.extend(items)
 
                 if not next_url or next_url == current_url:
@@ -121,7 +125,7 @@ class LetterboxdBrowserScraper(LetterboxdScraperPort):
 
                 current_url = next_url
                 page_num += 1
-                time.sleep(0.5)
+                time.sleep(0.3)
 
         return all_items
 
@@ -138,7 +142,7 @@ class LetterboxdBrowserScraper(LetterboxdScraperPort):
                 logger.info("Scraping Letterboxd watchlist page %d: %s", page_num, current_url)
                 page.get(current_url)
                 try:
-                    page.wait.eles_loaded("css:li.griditem, div[data-component-class='LazyPoster']", timeout=8)
+                    page.wait.eles_loaded("css:li.griditem, div[data-component-class='LazyPoster']", timeout=3)
                 except Exception:
                     logger.debug("Timeout waiting for grid items on watchlist page %d", page_num)
 
@@ -148,6 +152,11 @@ class LetterboxdBrowserScraper(LetterboxdScraperPort):
                     default_type=LetterboxdItemType.WATCHLIST,
                 )
                 logger.info("Parsed %d watchlist items from page %d", len(items), page_num)
+
+                if not items:
+                    logger.info("No more watchlist items found on page %d, ending pagination.", page_num)
+                    break
+
                 all_items.extend(items)
 
                 if not next_url or next_url == current_url:
@@ -155,7 +164,7 @@ class LetterboxdBrowserScraper(LetterboxdScraperPort):
 
                 current_url = next_url
                 page_num += 1
-                time.sleep(0.5)
+                time.sleep(0.3)
 
         return all_items
 
