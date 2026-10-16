@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, HardDrive, Filter, Plus, BookmarkCheck, Film, Loader2, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Star,
+  HardDrive,
+  Filter,
+  Plus,
+  BookmarkCheck,
+  Film,
+  Loader2,
+  FolderOpen,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
+  Check,
+  Clock,
+  RotateCcw,
+  Bookmark,
+} from 'lucide-react';
 import { useLibraryItems } from '../hooks/useLibraryItems';
 import { useLibraries } from '../hooks/useLibraries';
 import { getTmdbImageUrl, LibraryItem } from '../types/api';
@@ -51,15 +69,30 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
   const [resolutionFilter, setResolutionFilter] = useState<string>('ALL');
   const [onlineOnly, setOnlineOnly] = useState<boolean>(false);
   const [selectedGenre, setSelectedGenre] = useState<string>('ALL');
+  const [watchStatus, setWatchStatus] = useState<'ALL' | 'WATCHED' | 'UNWATCHED'>('ALL');
+  const [watchlistStatus, setWatchlistStatus] = useState<'ALL' | 'IN_WATCHLIST' | 'NOT_IN_WATCHLIST'>('ALL');
+  const [sortBy, setSortBy] = useState<string>('added_at');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(48);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isManageLibrariesOpen, setIsManageLibrariesOpen] = useState(false);
 
-  // Reset to page 1 on search or filter change
+  // Reset to page 1 on search, filter, or sort change
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, selectedLibraryId, selectedGenre, resolutionFilter, onlineOnly, pageSize]);
+  }, [
+    searchQuery,
+    selectedLibraryId,
+    selectedGenre,
+    resolutionFilter,
+    onlineOnly,
+    watchStatus,
+    watchlistStatus,
+    sortBy,
+    sortOrder,
+    pageSize,
+  ]);
 
   const { libraries } = useLibraries();
 
@@ -79,23 +112,98 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
     genre: selectedGenre,
     resolution: resolutionFilter,
     onlineOnly,
+    watchStatus,
+    inWatchlist: watchlistStatus,
+    sortBy,
+    sortOrder,
     page,
     pageSize,
   });
 
+  const hasActiveFilters =
+    selectedLibraryId !== null ||
+    selectedGenre !== 'ALL' ||
+    resolutionFilter !== 'ALL' ||
+    onlineOnly ||
+    watchStatus !== 'ALL' ||
+    watchlistStatus !== 'ALL' ||
+    sortBy !== 'added_at' ||
+    sortOrder !== 'desc';
+
+  const handleResetFilters = () => {
+    setSelectedLibraryId(null);
+    setSelectedGenre('ALL');
+    setResolutionFilter('ALL');
+    setOnlineOnly(false);
+    setWatchStatus('ALL');
+    setWatchlistStatus('ALL');
+    setSortBy('added_at');
+    setSortOrder('desc');
+    setPage(1);
+  };
+
+  const handleSortChange = (newSortBy: string) => {
+    setSortBy(newSortBy);
+    if (newSortBy === 'title') {
+      setSortOrder('asc');
+    } else {
+      setSortOrder('desc');
+    }
+  };
+
+  const toggleSortOrder = () => {
+    setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+  };
+
   return (
     <div className="space-y-6">
-      {/* Page Title & Clean Single-Row Filter Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-shelf-card border border-shelf-border p-4 rounded-xl">
+      {/* Top Header & Action Buttons */}
+      <div className="bg-shelf-card border border-shelf-border p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
         <div>
-          <h2 className="text-xl font-bold text-white">کتابخانه اصلی فیلم‌ها</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            نمایش {items.length} اثر از {totalCount} عنوان در آرشیو شخصی شما
+          <h2 className="text-xl sm:text-2xl font-extrabold text-white">کتابخانه فیلم‌ها و آرشیو</h2>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            نمایش <strong className="text-shelf-amber font-mono">{items.length}</strong> اثر از مجموع{' '}
+            <strong className="text-white font-mono">{totalCount}</strong> عنوان در آرشیو شخصی شما
           </p>
         </div>
 
-        {/* Consolidated 1-Row Filter Controls */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => setIsManageLibrariesOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-shelf-bg hover:bg-slate-800 text-slate-300 hover:text-white border border-shelf-border text-xs font-medium flex items-center gap-2 transition"
+            title="مدیریت مسیرها و اسکن هاردهای متصل"
+          >
+            <FolderOpen className="w-4 h-4 text-shelf-amber" />
+            <span>پوشه‌ها و اسکن</span>
+          </button>
+
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-shelf-amber hover:bg-shelf-amberHover text-black text-xs font-bold flex items-center gap-2 shadow-md transition"
+          >
+            <Plus className="w-4 h-4" />
+            <span>افزودن از TMDb</span>
+          </button>
+
+          <Link
+            to="/watchlist"
+            className="px-3.5 py-2 rounded-xl bg-shelf-bg hover:bg-slate-800 text-purple-300 border border-shelf-border text-xs font-medium flex items-center gap-2 transition"
+          >
+            <BookmarkCheck className="w-4 h-4 text-purple-400" />
+            <span>واچ‌لیست و دانلودها</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Comprehensive Filter & Sort Toolbar */}
+      <div className="bg-shelf-card/90 border border-shelf-border p-4 rounded-2xl space-y-4 shadow-md">
+        {/* Row 1: Filters */}
+        <div className="flex flex-wrap items-center gap-2.5 text-xs">
+          <div className="flex items-center gap-1.5 text-slate-400 shrink-0 font-medium ml-1">
+            <Filter className="w-4 h-4 text-shelf-amber" />
+            <span>فیلترها:</span>
+          </div>
+
           {/* Library Selector */}
           {libraries.length > 0 && (
             <select
@@ -103,7 +211,7 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
               onChange={(e) =>
                 setSelectedLibraryId(e.target.value === 'ALL' ? null : Number(e.target.value))
               }
-              className="bg-shelf-bg border border-shelf-border rounded-lg px-3 py-1.5 text-xs text-shelf-amber font-medium focus:outline-none focus:border-shelf-amber"
+              className="bg-shelf-bg border border-shelf-border rounded-xl px-3 py-2 text-shelf-amber font-medium focus:outline-none focus:border-shelf-amber"
             >
               <option value="ALL">همه کتابخانه‌ها ({libraries.length})</option>
               {libraries.map((lib) => (
@@ -114,15 +222,11 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
             </select>
           )}
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
-            <Filter className="w-3.5 h-3.5 text-shelf-amber" />
-            <span>فیلتر:</span>
-          </div>
-
+          {/* Genre Filter */}
           <select
             value={selectedGenre}
             onChange={(e) => setSelectedGenre(e.target.value)}
-            className="bg-shelf-bg border border-shelf-border rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-shelf-amber"
+            className="bg-shelf-bg border border-shelf-border rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-shelf-amber"
           >
             <option value="ALL">همه ژانرها</option>
             {allGenres.map((g) => (
@@ -132,10 +236,11 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
             ))}
           </select>
 
+          {/* Resolution Filter */}
           <select
             value={resolutionFilter}
             onChange={(e) => setResolutionFilter(e.target.value)}
-            className="bg-shelf-bg border border-shelf-border rounded-lg px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-shelf-amber"
+            className="bg-shelf-bg border border-shelf-border rounded-xl px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-shelf-amber"
           >
             <option value="ALL">همه کیفیت‌ها</option>
             <option value="4K">4K UHD</option>
@@ -143,9 +248,33 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
             <option value="720p">720p</option>
           </select>
 
+          {/* Watched Status Filter */}
+          <select
+            value={watchStatus}
+            onChange={(e) => setWatchStatus(e.target.value as any)}
+            className="bg-shelf-bg border border-shelf-border rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-shelf-amber font-medium"
+          >
+            <option value="ALL">همه وضعیت‌های تماشا</option>
+            <option value="WATCHED">✓ فقط دیده‌شده‌ها (Watched)</option>
+            <option value="UNWATCHED">○ فقط دیده‌نشده‌ها (Unwatched)</option>
+          </select>
+
+          {/* Watchlist Filter */}
+          <select
+            value={watchlistStatus}
+            onChange={(e) => setWatchlistStatus(e.target.value as any)}
+            className="bg-shelf-bg border border-shelf-border rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-shelf-amber font-medium"
+          >
+            <option value="ALL">همه وضعیت‌های واچ‌لیست</option>
+            <option value="IN_WATCHLIST">🔖 در واچ‌لیست (Watchlist)</option>
+            <option value="NOT_IN_WATCHLIST">خارج از واچ‌لیست</option>
+          </select>
+
+          {/* Online Drives Only Toggle */}
           <button
+            type="button"
             onClick={() => setOnlineOnly(!onlineOnly)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition ${
+            className={`px-3 py-2 rounded-xl text-xs font-medium border flex items-center gap-2 transition ${
               onlineOnly
                 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
                 : 'bg-shelf-bg border-shelf-border text-slate-300 hover:border-slate-600'
@@ -156,16 +285,64 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
                 onlineOnly ? 'bg-emerald-400' : 'bg-slate-500'
               }`}
             />
-            فقط هاردهای متصل
+            <span>فقط هاردهای متصل</span>
           </button>
+        </div>
 
-          <button
-            onClick={() => setIsManageLibrariesOpen(true)}
-            className="p-1.5 rounded-lg bg-shelf-bg border border-shelf-border text-slate-300 hover:text-white hover:border-slate-600 transition"
-            title="مدیریت ریشه‌ها و اسکن هارد"
-          >
-            <FolderOpen className="w-4 h-4 text-shelf-amber" />
-          </button>
+        {/* Row 2: Sorting & Reset */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-shelf-border/60 text-xs">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-1.5 text-slate-400 shrink-0 font-medium ml-1">
+              <ArrowUpDown className="w-4 h-4 text-shelf-amber" />
+              <span>مرتب‌سازی:</span>
+            </div>
+
+            <select
+              value={sortBy}
+              onChange={(e) => handleSortChange(e.target.value)}
+              className="bg-shelf-bg border border-shelf-border rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-shelf-amber"
+            >
+              <option value="added_at">جدیدترین در آرشیو (تاریخ افزودن)</option>
+              <option value="imdb_rating">بالاترین نمره IMDb</option>
+              <option value="user_rating">بالاترین امتیاز من (Personal Rating)</option>
+              <option value="tmdb_rating">بالاترین نمره TMDb</option>
+              <option value="release_year">سال ساخت اثر</option>
+              <option value="runtime">مدت زمان فیلم (طولانی‌ترین)</option>
+              <option value="title">عنوان اثر (الفبایی)</option>
+            </select>
+
+            {/* Sort Order Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleSortOrder}
+              className="px-3 py-2 rounded-xl bg-shelf-bg hover:bg-slate-800 border border-shelf-border text-slate-200 hover:text-white flex items-center gap-1.5 transition font-medium"
+              title={sortOrder === 'desc' ? 'ترتیب فعلی: نزولی (بیشترین/جدیدترین). برای صعودی کلیک کنید' : 'ترتیب فعلی: صعودی (کمترین/قدیمی‌ترین). برای نزولی کلیک کنید'}
+            >
+              {sortOrder === 'desc' ? (
+                <>
+                  <ArrowDown className="w-3.5 h-3.5 text-shelf-amber" />
+                  <span>نزولی (بیشترین / جدیدترین)</span>
+                </>
+              ) : (
+                <>
+                  <ArrowUp className="w-3.5 h-3.5 text-shelf-amber" />
+                  <span>صعودی (کمترین / قدیمی‌ترین)</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Reset Filters Button */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 flex items-center gap-1.5 transition"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>پاک‌سازی تمام فیلترها و مرتب‌سازی</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -239,14 +416,10 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
         <div className="p-12 text-center bg-shelf-card border border-shelf-border rounded-2xl space-y-3">
           <p className="text-sm text-slate-300 font-bold">فیلمی با فیلترهای انتخابی شما پیدا نشد</p>
           <button
-            onClick={() => {
-              setSelectedGenre('ALL');
-              setResolutionFilter('ALL');
-              setOnlineOnly(false);
-            }}
-            className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition"
+            onClick={handleResetFilters}
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition"
           >
-            پاک کردن تمام فیلترها
+            پاک کردن تمام فیلترها و نمایش همه فیلم‌ها
           </button>
         </div>
       )}
@@ -258,8 +431,14 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
             const movie = item.work;
             const bestRes = getBestResolution(item);
             const isOnline = isItemOnline(item);
-            const userRating = item.personal_record?.user_rating;
-            const displayRating = userRating || movie.imdb_rating || movie.tmdb_rating;
+            const pr = item.personal_record;
+            const userRating = pr?.user_rating;
+            const isWatched =
+              pr?.watch_status === 'COMPLETED' ||
+              pr?.watch_status === 'WATCHING' ||
+              (pr?.watch_count || 0) > 0 ||
+              userRating != null;
+            const inWatchlist = Boolean(pr?.in_watchlist);
 
             return (
               <Link
@@ -276,37 +455,91 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
 
-                  {/* Top-Right Badge: Best Resolution */}
-                  <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-shelf-amber font-mono text-[11px] font-bold border border-white/10">
-                    {bestRes}
-                  </span>
-
-                  {/* Top-Left Badge: Drive Online / Offline Status */}
-                  <span
-                    className={`absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-md flex items-center gap-1 border ${
-                      isOnline
-                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/30'
-                        : 'bg-red-950/80 text-red-300 border-red-500/30'
-                    }`}
-                  >
-                    <HardDrive className="w-3 h-3" />
-                    <span>{isOnline ? 'آماده پخش' : 'آرشیو آفلاین'}</span>
-                  </span>
-
-                  {/* Gradient Overlay for bottom text legibility */}
-                  <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
-
-                  {/* Bottom details on poster */}
-                  <div className="absolute bottom-2.5 inset-x-2.5 flex items-center justify-between text-xs text-white">
-                    <span className="font-mono text-slate-300 text-[11px]">
-                      {movie.release_year || '—'}
+                  {/* Top-Right Badges (Resolution & Watchlist) */}
+                  <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 z-10">
+                    <span className="px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-shelf-amber font-mono text-[11px] font-bold border border-white/10 shadow-sm">
+                      {bestRes}
                     </span>
-                    {displayRating && (
-                      <span className="flex items-center gap-1 bg-black/60 px-1.5 py-0.5 rounded font-mono text-amber-400 text-xs">
-                        <Star className="w-3 h-3 fill-amber-400" />
-                        {displayRating}
+                    {inWatchlist && (
+                      <span
+                        className="px-2 py-0.5 rounded-md bg-purple-950/85 backdrop-blur-md text-purple-300 border border-purple-500/40 text-[10px] font-medium flex items-center gap-1 shadow-sm"
+                        title="در واچ‌لیست شما"
+                      >
+                        <Bookmark className="w-2.5 h-2.5 fill-purple-400" />
+                        <span>واچ‌لیست</span>
                       </span>
                     )}
+                  </div>
+
+                  {/* Top-Left Badges (Drive status & Watched) */}
+                  <div className="absolute top-2 left-2 flex flex-col items-start gap-1.5 z-10">
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-medium backdrop-blur-md flex items-center gap-1 border shadow-sm ${
+                        isOnline
+                          ? 'bg-emerald-950/85 text-emerald-300 border-emerald-500/30'
+                          : 'bg-red-950/85 text-red-300 border-red-500/30'
+                      }`}
+                    >
+                      <HardDrive className="w-3 h-3" />
+                      <span>{isOnline ? 'آنلاین' : 'آفلاین'}</span>
+                    </span>
+
+                    {isWatched && (
+                      <span
+                        className="px-2 py-0.5 rounded-md bg-emerald-950/85 backdrop-blur-md text-emerald-300 border border-emerald-500/40 text-[10px] font-medium flex items-center gap-1 shadow-sm"
+                        title="دیده‌شده"
+                      >
+                        <Check className="w-2.5 h-2.5" />
+                        <span>دیده‌شده</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Gradient Overlay for bottom text legibility */}
+                  <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/95 via-black/50 to-transparent pointer-events-none" />
+
+                  {/* Bottom details on poster */}
+                  <div className="absolute bottom-2.5 inset-x-2.5 flex items-center justify-between text-xs text-white z-10">
+                    <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-300">
+                      <span>{movie.release_year || '—'}</span>
+                      {movie.runtime_minutes ? (
+                        <>
+                          <span className="text-slate-500">•</span>
+                          <span className="flex items-center gap-0.5 text-slate-300">
+                            <Clock className="w-2.5 h-2.5 text-slate-400" />
+                            {movie.runtime_minutes}د
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {userRating != null ? (
+                        <span
+                          className="flex items-center gap-1 bg-amber-500/25 border border-amber-400/50 px-1.5 py-0.5 rounded font-mono text-amber-300 text-xs font-bold"
+                          title={`امتیاز من: ${userRating} از ۱۰`}
+                        >
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          <span>{userRating}</span>
+                        </span>
+                      ) : movie.imdb_rating ? (
+                        <span
+                          className="flex items-center gap-1 bg-black/70 border border-white/10 px-1.5 py-0.5 rounded font-mono text-amber-400 text-xs"
+                          title="نمره IMDb"
+                        >
+                          <Star className="w-3 h-3 fill-amber-400" />
+                          <span>{movie.imdb_rating}</span>
+                        </span>
+                      ) : movie.tmdb_rating ? (
+                        <span
+                          className="flex items-center gap-1 bg-black/70 border border-white/10 px-1.5 py-0.5 rounded font-mono text-emerald-400 text-xs"
+                          title="نمره TMDb"
+                        >
+                          <Star className="w-3 h-3 fill-emerald-400" />
+                          <span>{movie.tmdb_rating.toFixed(1)}</span>
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
@@ -396,34 +629,17 @@ export const LibraryPage: React.FC<{ searchQuery: string }> = ({ searchQuery }) 
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
-
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <span>تعداد در صفحه:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setPage(1);
-              }}
-              className="bg-slate-900 border border-shelf-border text-white rounded-lg px-2.5 py-1 text-xs outline-none focus:border-shelf-amber"
-            >
-              <option value={24}>۲۴ اثر</option>
-              <option value={48}>۴۸ اثر</option>
-              <option value={96}>۹۶ اثر</option>
-              <option value={500}>همه اثرها</option>
-            </select>
-          </div>
         </div>
       )}
+
+      {/* Add Work Modal */}
+      <AddWorkModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
 
       {/* Manage Libraries Modal */}
       <ManageLibrariesModal
         isOpen={isManageLibrariesOpen}
         onClose={() => setIsManageLibrariesOpen(false)}
       />
-
-      {/* Add Work Modal */}
-      <AddWorkModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
     </div>
   );
 };

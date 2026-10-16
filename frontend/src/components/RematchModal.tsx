@@ -90,7 +90,7 @@ export const RematchModal: React.FC<RematchModalProps> = ({
       setTimeout(() => {
         onClose();
         if (updatedItem.work_id) {
-          navigate(`/movie/${updatedItem.work_id}`);
+          navigate(`/works/${updatedItem.work_id}`);
         }
       }, 1200);
     } catch (err: any) {

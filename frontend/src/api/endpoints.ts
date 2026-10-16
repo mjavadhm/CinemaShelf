@@ -49,6 +49,10 @@ export async function getLibraryItems(params?: {
   library_id?: number;
   search?: string;
   genre?: string;
+  watch_status?: string;
+  in_watchlist?: boolean;
+  sort_by?: string;
+  sort_order?: string;
   limit?: number;
   offset?: number;
   page?: number;

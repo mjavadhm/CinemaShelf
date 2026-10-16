@@ -134,6 +134,7 @@ export interface PersonalSummary {
   in_watchlist: boolean;
   is_favorite: boolean;
   watch_status?: WatchStatus | string | null;
+  watch_count?: number | null;
   last_watched_at?: string | null;
 }
 

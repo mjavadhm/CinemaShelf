@@ -67,6 +67,7 @@ class PersonalSummary(BaseModel):
     in_watchlist: bool = False
     is_favorite: bool = False
     watch_status: str | None = None
+    watch_count: int = 0
     last_watched_at: datetime | None = None
 
 

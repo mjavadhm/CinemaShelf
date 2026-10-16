@@ -112,15 +112,23 @@ class LibraryService:
         library_id: int | None = None,
         search: str | None = None,
         genre: str | None = None,
+        watch_status_filter: str | None = None,
+        in_watchlist_filter: bool | None = None,
+        sort_by: str = "added_at",
+        sort_order: str = "desc",
         limit: int = 50,
         offset: int = 0,
     ) -> Sequence[LibraryItem]:
-        """List library items with filtering."""
+        """List library items with filtering and sorting."""
         return self.repository.list_items(
             status=status,
             library_id=library_id,
             search=search,
             genre=genre,
+            watch_status_filter=watch_status_filter,
+            in_watchlist_filter=in_watchlist_filter,
+            sort_by=sort_by,
+            sort_order=sort_order,
             limit=limit,
             offset=offset,
         )
@@ -131,6 +139,8 @@ class LibraryService:
         library_id: int | None = None,
         search: str | None = None,
         genre: str | None = None,
+        watch_status_filter: str | None = None,
+        in_watchlist_filter: bool | None = None,
     ) -> int:
         """Count total library items matching query filters."""
         return self.repository.count_items(
@@ -138,6 +148,8 @@ class LibraryService:
             library_id=library_id,
             search=search,
             genre=genre,
+            watch_status_filter=watch_status_filter,
+            in_watchlist_filter=in_watchlist_filter,
         )
 
     def update_status(self, item_id: int, status: LibraryItemStatus) -> LibraryItem:

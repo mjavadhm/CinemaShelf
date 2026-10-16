@@ -9,6 +9,10 @@ export interface LibraryFilters {
   genre?: string;
   resolution?: string;
   onlineOnly?: boolean;
+  watchStatus?: 'ALL' | 'WATCHED' | 'UNWATCHED';
+  inWatchlist?: 'ALL' | 'IN_WATCHLIST' | 'NOT_IN_WATCHLIST';
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
 }
@@ -18,6 +22,16 @@ export function useLibraryItems(filters: LibraryFilters = {}) {
   const pageSize = filters.pageSize || 48;
   const searchTrimmed = filters.search?.trim() || undefined;
   const genreParam = filters.genre && filters.genre !== 'ALL' ? filters.genre : undefined;
+  const watchStatusParam =
+    filters.watchStatus && filters.watchStatus !== 'ALL' ? filters.watchStatus : undefined;
+  const inWatchlistParam =
+    filters.inWatchlist === 'IN_WATCHLIST'
+      ? true
+      : filters.inWatchlist === 'NOT_IN_WATCHLIST'
+      ? false
+      : undefined;
+  const sortByParam = filters.sortBy || 'added_at';
+  const sortOrderParam = filters.sortOrder || 'desc';
 
   const query = useQuery({
     queryKey: [
@@ -26,6 +40,10 @@ export function useLibraryItems(filters: LibraryFilters = {}) {
       filters.libraryId,
       searchTrimmed,
       genreParam,
+      watchStatusParam,
+      inWatchlistParam,
+      sortByParam,
+      sortOrderParam,
       page,
       pageSize,
     ],
@@ -35,6 +53,10 @@ export function useLibraryItems(filters: LibraryFilters = {}) {
         library_id: filters.libraryId || undefined,
         search: searchTrimmed,
         genre: genreParam,
+        watch_status: watchStatusParam,
+        in_watchlist: inWatchlistParam,
+        sort_by: sortByParam,
+        sort_order: sortOrderParam,
         limit: pageSize,
         page: page,
       }),

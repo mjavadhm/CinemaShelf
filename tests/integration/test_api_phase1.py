@@ -227,3 +227,39 @@ def test_rematch_library_item_endpoint(client: TestClient, mock_provider: AsyncM
     )
     assert by_work_resp.status_code == 200
     assert by_work_resp.json()["work"]["title"] == "Inception"
+
+
+def test_library_items_sorting_and_filtering(client: TestClient) -> None:
+    """Verify filtering by watch_status and in_watchlist, and sorting by user_rating."""
+    # Clean setup: add item 1
+    resp1 = client.post(
+        "/library/items",
+        json={"tmdb_id": 157336, "work_type": "MOVIE", "status": "AVAILABLE"},
+    )
+    assert resp1.status_code in (200, 201)
+    work1_id = resp1.json()["work_id"]
+
+    # Rate item 1 (user rating 10 -> watched)
+    client.post(
+        f"/personal/records/{work1_id}/rate",
+        json={"rating": 10.0},
+    )
+
+    # Filter: WATCHED
+    watched_resp = client.get("/library/items?watch_status=WATCHED")
+    assert watched_resp.status_code == 200
+    watched_items = watched_resp.json()
+    assert any(it["work_id"] == work1_id for it in watched_items)
+
+    # Filter: UNWATCHED
+    unwatched_resp = client.get("/library/items?watch_status=UNWATCHED")
+    assert unwatched_resp.status_code == 200
+    unwatched_items = unwatched_resp.json()
+    assert not any(it["work_id"] == work1_id for it in unwatched_items)
+
+    # Sort by user_rating desc
+    sort_resp = client.get("/library/items?sort_by=user_rating&sort_order=desc")
+    assert sort_resp.status_code == 200
+    sorted_items = sort_resp.json()
+    assert sorted_items[0]["work_id"] == work1_id
+

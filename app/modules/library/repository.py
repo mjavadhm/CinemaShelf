@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.modules.library.models import (
@@ -15,6 +15,7 @@ from app.modules.library.models import (
     ScanJob,
 )
 from app.modules.metadata.models import MediaWork
+from app.modules.personal.models import PersonalRecord, WatchStatus
 
 
 class LibraryRepository:
@@ -53,8 +54,12 @@ class LibraryRepository:
         library_id: int | None = None,
         search: str | None = None,
         genre: str | None = None,
+        watch_status_filter: str | None = None,
+        in_watchlist_filter: bool | None = None,
     ):
-        stmt = select(LibraryItem)
+        stmt = select(LibraryItem).join(MediaWork, MediaWork.id == LibraryItem.work_id)
+        stmt = stmt.outerjoin(PersonalRecord, PersonalRecord.work_id == MediaWork.id)
+
         if library_id is not None:
             stmt = stmt.join(
                 LibraryMembership, LibraryMembership.work_id == LibraryItem.work_id
@@ -62,9 +67,6 @@ class LibraryRepository:
 
         if status:
             stmt = stmt.where(LibraryItem.status == status)
-
-        if search or (genre and genre != "ALL"):
-            stmt = stmt.join(MediaWork, MediaWork.id == LibraryItem.work_id)
 
         if search:
             q = f"%{search.strip().lower()}%"
@@ -91,6 +93,46 @@ class LibraryRepository:
                 )
             )
 
+        if watch_status_filter:
+            norm_watch = watch_status_filter.strip().upper()
+            if norm_watch == "WATCHED":
+                stmt = stmt.where(
+                    or_(
+                        PersonalRecord.watch_status.in_(
+                            [WatchStatus.COMPLETED, WatchStatus.WATCHING]
+                        ),
+                        PersonalRecord.watch_count > 0,
+                        PersonalRecord.user_rating.is_not(None),
+                    )
+                )
+            elif norm_watch == "UNWATCHED":
+                stmt = stmt.where(
+                    or_(
+                        PersonalRecord.id.is_(None),
+                        and_(
+                            PersonalRecord.watch_status.notin_(
+                                [WatchStatus.COMPLETED, WatchStatus.WATCHING]
+                            ),
+                            or_(
+                                PersonalRecord.watch_count == 0,
+                                PersonalRecord.watch_count.is_(None),
+                            ),
+                            PersonalRecord.user_rating.is_(None),
+                        ),
+                    )
+                )
+
+        if in_watchlist_filter is not None:
+            if in_watchlist_filter:
+                stmt = stmt.where(PersonalRecord.in_watchlist.is_(True))
+            else:
+                stmt = stmt.where(
+                    or_(
+                        PersonalRecord.id.is_(None),
+                        PersonalRecord.in_watchlist.is_(False),
+                    )
+                )
+
         return stmt
 
     def list_items(
@@ -99,20 +141,48 @@ class LibraryRepository:
         library_id: int | None = None,
         search: str | None = None,
         genre: str | None = None,
+        watch_status_filter: str | None = None,
+        in_watchlist_filter: bool | None = None,
+        sort_by: str = "added_at",
+        sort_order: str = "desc",
         limit: int = 50,
         offset: int = 0,
     ) -> Sequence[LibraryItem]:
-        """List library items with optional status, library, search, and genre filtering."""
+        """List library items with filtering and multi-attribute sorting."""
         stmt = (
             self._build_items_query(
-                status=status, library_id=library_id, search=search, genre=genre
+                status=status,
+                library_id=library_id,
+                search=search,
+                genre=genre,
+                watch_status_filter=watch_status_filter,
+                in_watchlist_filter=in_watchlist_filter,
             )
             .options(
-                joinedload(LibraryItem.work),
+                joinedload(LibraryItem.work).joinedload(MediaWork.personal_record),
                 selectinload(LibraryItem.media_files),
             )
-            .order_by(LibraryItem.added_at.desc())
         )
+
+        is_asc = sort_order.strip().lower() == "asc"
+
+        sort_col_map = {
+            "imdb_rating": MediaWork.imdb_rating,
+            "user_rating": PersonalRecord.user_rating,
+            "tmdb_rating": MediaWork.tmdb_rating,
+            "runtime": MediaWork.runtime_minutes,
+            "release_year": MediaWork.release_year,
+            "title": func.lower(MediaWork.title),
+            "added_at": LibraryItem.added_at,
+        }
+
+        col = sort_col_map.get(sort_by.lower(), LibraryItem.added_at)
+
+        if is_asc:
+            stmt = stmt.order_by(col.asc().nulls_last(), LibraryItem.id.asc())
+        else:
+            stmt = stmt.order_by(col.desc().nulls_last(), LibraryItem.id.desc())
+
         stmt = stmt.limit(limit).offset(offset)
         return self.session.scalars(stmt).unique().all()
 
@@ -122,10 +192,17 @@ class LibraryRepository:
         library_id: int | None = None,
         search: str | None = None,
         genre: str | None = None,
+        watch_status_filter: str | None = None,
+        in_watchlist_filter: bool | None = None,
     ) -> int:
         """Count total library items matching query filters."""
         stmt = self._build_items_query(
-            status=status, library_id=library_id, search=search, genre=genre
+            status=status,
+            library_id=library_id,
+            search=search,
+            genre=genre,
+            watch_status_filter=watch_status_filter,
+            in_watchlist_filter=in_watchlist_filter,
         )
         subq = stmt.subquery()
         count_stmt = select(func.count()).select_from(subq)

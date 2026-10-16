@@ -68,11 +68,26 @@ def list_library_items(
     genre: Annotated[
         str | None, Query(description="Filter by genre name or persian_name")
     ] = None,
+    watch_status: Annotated[
+        str | None, Query(description="Filter by watch status: WATCHED, UNWATCHED, or ALL")
+    ] = None,
+    in_watchlist: Annotated[
+        bool | None, Query(description="Filter by watchlist membership: True or False")
+    ] = None,
+    sort_by: Annotated[
+        str,
+        Query(
+            description="Sort field: added_at, imdb_rating, user_rating, tmdb_rating, runtime, release_year, title"
+        ),
+    ] = "added_at",
+    sort_order: Annotated[
+        str, Query(description="Sort order: 'asc' or 'desc'")
+    ] = "desc",
     limit: Annotated[int, Query(ge=1, le=1000)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
     page: Annotated[int | None, Query(ge=1, description="1-indexed page number")] = None,
 ) -> list[LibraryItemSummaryResponse]:
-    """List library items with optional search, genre, status, and library filtering."""
+    """List library items with optional search, genre, watch status, watchlist, and multi-field sorting."""
     actual_offset = (page - 1) * limit if page is not None else offset
 
     total_count = service.count_items(
@@ -80,12 +95,18 @@ def list_library_items(
         library_id=library_id,
         search=search,
         genre=genre,
+        watch_status_filter=watch_status,
+        in_watchlist_filter=in_watchlist,
     )
     items = service.list_items(
         status=status,
         library_id=library_id,
         search=search,
         genre=genre,
+        watch_status_filter=watch_status,
+        in_watchlist_filter=in_watchlist,
+        sort_by=sort_by,
+        sort_order=sort_order,
         limit=limit,
         offset=actual_offset,
     )
