@@ -8,6 +8,7 @@ import {
   ExternalSearchResult,
   FileAccessResult,
   ImportSummary,
+  LetterboxdRateResult,
   Library,
   LibraryItem,
   LibraryRoot,
@@ -451,6 +452,69 @@ export async function listSyncRuns(params?: {
   offset?: number;
 }): Promise<any[]> {
   const response = await apiClient.get('/integrations/sync-runs', { params });
+  return response.data;
+}
+
+export async function syncLetterboxdLocalHtml(
+  folderPath: string = 'for scraping',
+  conflictPolicy: 'PRESERVE_LOCAL' | 'OVERWRITE_LOCAL' = 'PRESERVE_LOCAL',
+  scaleMode: 'RAW' | 'TEN_POINT' = 'TEN_POINT'
+): Promise<ImportSummary> {
+  const response = await apiClient.post<ImportSummary>(
+    '/integrations/letterboxd/sync-local-html',
+    {
+      folder_path: folderPath,
+      conflict_policy: conflictPolicy,
+      scale_mode: scaleMode,
+    }
+  );
+  return response.data;
+}
+
+export async function syncLetterboxdViaBrowser(
+  username: string,
+  includeWatchlist: boolean = true,
+  maxPages: number = 20,
+  conflictPolicy: 'PRESERVE_LOCAL' | 'OVERWRITE_LOCAL' = 'PRESERVE_LOCAL',
+  scaleMode: 'RAW' | 'TEN_POINT' = 'TEN_POINT'
+): Promise<ImportSummary> {
+  const response = await apiClient.post<ImportSummary>(
+    '/integrations/letterboxd/browser-sync',
+    {
+      username,
+      include_watchlist: includeWatchlist,
+      max_pages: maxPages,
+      conflict_policy: conflictPolicy,
+      scale_mode: scaleMode,
+    }
+  );
+  return response.data;
+}
+
+export async function openLetterboxdBrowser(
+  url: string = 'https://letterboxd.com'
+): Promise<{ status: string; url: string }> {
+  const response = await apiClient.post<{ status: string; url: string }>(
+    '/integrations/letterboxd/open-browser',
+    null,
+    {
+      params: { url },
+    }
+  );
+  return response.data;
+}
+
+export async function rateMovieOnLetterboxd(
+  workId: number,
+  rating: number
+): Promise<LetterboxdRateResult> {
+  const response = await apiClient.post<LetterboxdRateResult>(
+    '/integrations/letterboxd/rate',
+    {
+      work_id: workId,
+      rating,
+    }
+  );
   return response.data;
 }
 

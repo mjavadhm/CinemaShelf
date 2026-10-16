@@ -155,6 +155,21 @@ class LetterboxdPort(Protocol):
         """Parse an in-memory Letterboxd export ZIP archive into structured collections."""
         ...
 
+    def parse_html(
+        self,
+        content: str | bytes,
+        default_type: LetterboxdItemType | None = None,
+    ) -> tuple[list[LetterboxdItem], str | None]:
+        """Parse Letterboxd HTML text/bytes returning items and next page URL."""
+        ...
+
+    def parse_local_folder(
+        self,
+        folder_path: str = "for scraping",
+    ) -> list[LetterboxdItem]:
+        """Parse all saved Letterboxd HTML files in a local directory."""
+        ...
+
 
 class LetterboxdClient(LetterboxdPort):
     """Concrete adapter for Letterboxd CSV and export archive ingestion."""
@@ -304,3 +319,22 @@ class LetterboxdClient(LetterboxdPort):
             raise ValueError(f"Invalid ZIP archive file: {exc}") from exc
 
         return archive
+
+    def parse_html(
+        self,
+        content: str | bytes,
+        default_type: LetterboxdItemType | None = None,
+    ) -> tuple[list[LetterboxdItem], str | None]:
+        """Parse Letterboxd HTML content into structured LetterboxdItem instances."""
+        from app.adapters.letterboxd.parser import LetterboxdHtmlParser
+
+        return LetterboxdHtmlParser().parse_html(content, default_type=default_type)
+
+    def parse_local_folder(
+        self,
+        folder_path: str = "for scraping",
+    ) -> list[LetterboxdItem]:
+        """Parse all saved Letterboxd HTML files from a local directory."""
+        from app.adapters.letterboxd.parser import LetterboxdHtmlParser
+
+        return LetterboxdHtmlParser().parse_local_folder(folder_path=folder_path)

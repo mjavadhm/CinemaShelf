@@ -1,4 +1,4 @@
-"""Letterboxd CSV parser and export archive extractor adapter."""
+"""Letterboxd parser and browser automation adapter."""
 
 from app.adapters.letterboxd.client import (
     LetterboxdClient,
@@ -7,11 +7,19 @@ from app.adapters.letterboxd.client import (
     LetterboxdItemType,
     LetterboxdPort,
 )
+from app.adapters.letterboxd.parser import LetterboxdHtmlParser
+from app.adapters.letterboxd.scraper import (
+    LetterboxdBrowserScraper,
+    LetterboxdScraperPort,
+)
 
 __all__ = [
+    "LetterboxdBrowserScraper",
     "LetterboxdClient",
     "LetterboxdExportArchive",
+    "LetterboxdHtmlParser",
     "LetterboxdItem",
     "LetterboxdItemType",
     "LetterboxdPort",
+    "LetterboxdScraperPort",
 ]

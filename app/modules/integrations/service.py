@@ -10,10 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.adapters.letterboxd import (
+    LetterboxdBrowserScraper,
     LetterboxdClient,
     LetterboxdItem,
     LetterboxdItemType,
     LetterboxdPort,
+    LetterboxdScraperPort,
 )
 from app.core.errors import ApplicationError
 from app.modules.integrations.models import (
@@ -26,6 +28,7 @@ from app.modules.integrations.repository import IntegrationsRepository
 from app.modules.integrations.schemas import (
     ConflictPolicy,
     ImportSummaryResponse,
+    LetterboxdRateResponse,
     RatingScaleMode,
     SyncRunResponse,
 )
@@ -51,12 +54,14 @@ class IntegrationsService:
         self,
         session: Session,
         letterboxd_client: LetterboxdPort | None = None,
+        letterboxd_scraper: LetterboxdScraperPort | None = None,
         metadata_service: MetadataService | None = None,
         personal_service: PersonalService | None = None,
     ) -> None:
         self.session = session
         self.repository = IntegrationsRepository(session)
         self.letterboxd_client = letterboxd_client or LetterboxdClient()
+        self.letterboxd_scraper = letterboxd_scraper or LetterboxdBrowserScraper()
         self.metadata_service = metadata_service or MetadataService(session)
         self.personal_service = personal_service or PersonalService(session)
 
@@ -76,12 +81,6 @@ class IntegrationsService:
             )
 
         lower_name = filename.lower()
-        watchlist_count = 0
-        ratings_count = 0
-        watched_count = 0
-        diary_count = 0
-        lists_count = 0
-
         if lower_name.endswith(".zip"):
             try:
                 archive = self.letterboxd_client.parse_zip_export(file_bytes)
@@ -91,28 +90,151 @@ class IntegrationsService:
                     message=str(exc),
                     status_code=400,
                 ) from exc
-
             items = archive.all_items
-            watchlist_count = len(archive.watchlist)
-            ratings_count = len(archive.ratings)
-            watched_count = len(archive.watched)
-            diary_count = len(archive.diary)
-            lists_count = sum(len(lst) for lst in archive.lists.values())
             sync_type = "LETTERBOXD_ZIP_EXPORT"
         else:
             items = self.letterboxd_client.parse_csv(file_bytes, filename=filename)
-            for it in items:
-                if it.entry_type == LetterboxdItemType.WATCHLIST:
-                    watchlist_count += 1
-                elif it.entry_type == LetterboxdItemType.RATING:
-                    ratings_count += 1
-                elif it.entry_type == LetterboxdItemType.WATCHED:
-                    watched_count += 1
-                elif it.entry_type == LetterboxdItemType.DIARY:
-                    diary_count += 1
-                elif it.entry_type == LetterboxdItemType.LIST:
-                    lists_count += 1
             sync_type = f"LETTERBOXD_CSV_{filename}"
+
+        return await self._process_items(
+            items=items,
+            sync_type=sync_type,
+            conflict_policy=conflict_policy,
+            scale_mode=scale_mode,
+        )
+
+    async def import_local_folder(
+        self,
+        folder_path: str = "for scraping",
+        conflict_policy: ConflictPolicy = ConflictPolicy.PRESERVE_LOCAL,
+        scale_mode: RatingScaleMode = RatingScaleMode.TEN_POINT,
+    ) -> ImportSummaryResponse:
+        """Parse all saved Letterboxd HTML files from a local directory and synchronize state."""
+        items = self.letterboxd_client.parse_local_folder(folder_path=folder_path)
+        if not items:
+            raise ApplicationError(
+                code="no_items_found",
+                message=f"No Letterboxd items found in '{folder_path}'",
+                status_code=404,
+            )
+
+        return await self._process_items(
+            items=items,
+            sync_type=f"LETTERBOXD_LOCAL_HTML_{folder_path}",
+            conflict_policy=conflict_policy,
+            scale_mode=scale_mode,
+        )
+
+    async def sync_via_browser(
+        self,
+        username: str,
+        include_watchlist: bool = True,
+        max_pages: int = 20,
+        conflict_policy: ConflictPolicy = ConflictPolicy.PRESERVE_LOCAL,
+        scale_mode: RatingScaleMode = RatingScaleMode.TEN_POINT,
+    ) -> ImportSummaryResponse:
+        """Perform automated multi-page browser scrape for a Letterboxd user."""
+        if not username.strip():
+            raise ApplicationError(
+                code="invalid_username",
+                message="Letterboxd username cannot be empty",
+                status_code=400,
+            )
+
+        if include_watchlist:
+            items = self.letterboxd_scraper.scrape_all(username=username, max_pages=max_pages)
+        else:
+            items = self.letterboxd_scraper.scrape_user_films(username=username, max_pages=max_pages)
+
+        return await self._process_items(
+            items=items,
+            sync_type=f"LETTERBOXD_BROWSER_{username}",
+            conflict_policy=conflict_policy,
+            scale_mode=scale_mode,
+        )
+
+    def open_letterboxd_browser(self, url: str = "https://letterboxd.com") -> dict[str, str]:
+        """Open the browser with the persistent profile for Letterboxd login."""
+        self.letterboxd_scraper.open_browser(url=url)
+        return {"status": "opened", "url": url}
+
+    def rate_movie_on_letterboxd(self, work_id: int, rating: int) -> LetterboxdRateResponse:
+        """Rate a movie on Letterboxd using the automated browser."""
+        work = self.session.get(MediaWork, work_id)
+        if not work:
+            raise ApplicationError(
+                code="work_not_found",
+                message=f"MediaWork with ID {work_id} not found",
+                status_code=404,
+            )
+
+        # Look up existing Letterboxd slug or URI mapping
+        mapping = self.repository.get_external_mapping(IntegrationProvider.LETTERBOXD, f"work:{work_id}")
+        slug: str | None = None
+        if mapping and "/film/" in mapping.external_key:
+            m = re.search(r"/film/([^/]+)/?", mapping.external_key)
+            if m:
+                slug = m.group(1)
+
+        try:
+            success = self.letterboxd_scraper.rate_film(
+                title=work.title,
+                rating_out_of_10=rating,
+                year=work.release_year,
+                slug=slug,
+            )
+        except Exception as exc:
+            logger.warning("Failed rating '%s' on Letterboxd: %s", work.title, exc)
+            raise ApplicationError(
+                code="letterboxd_rating_failed",
+                message=f"Failed to submit rating on Letterboxd: {exc}",
+                status_code=500,
+            ) from exc
+
+        # Also update local rating in personal state
+        record = self.personal_service.get_or_create_record(work.id)
+        record.user_rating = float(rating)
+        if record.watch_status == WatchStatus.UNWATCHED:
+            record.watch_status = WatchStatus.COMPLETED
+            if record.watch_count == 0:
+                record.watch_count = 1
+        self.session.commit()
+
+        return LetterboxdRateResponse(
+            work_id=work.id,
+            title=work.title,
+            rating=rating,
+            success=success,
+            message=f"Successfully rated '{work.title}' with {rating}/10 on Letterboxd.",
+        )
+
+    async def _process_items(
+        self,
+        items: list[LetterboxdItem],
+        sync_type: str,
+        conflict_policy: ConflictPolicy,
+        scale_mode: RatingScaleMode,
+    ) -> ImportSummaryResponse:
+        """Process and synchronize a list of parsed LetterboxdItems into the database."""
+        watchlist_count = 0
+        ratings_count = 0
+        watched_count = 0
+        diary_count = 0
+        lists_count = 0
+
+        for it in items:
+            if it.entry_type == LetterboxdItemType.WATCHLIST:
+                watchlist_count += 1
+            elif it.entry_type == LetterboxdItemType.RATING:
+                ratings_count += 1
+            elif it.entry_type == LetterboxdItemType.WATCHED:
+                watched_count += 1
+                if it.rating is not None:
+                    ratings_count += 1
+            elif it.entry_type == LetterboxdItemType.DIARY:
+                diary_count += 1
+            elif it.entry_type == LetterboxdItemType.LIST:
+                lists_count += 1
 
         sync_run = self.repository.create_sync_run(
             provider=IntegrationProvider.LETTERBOXD,
@@ -120,7 +242,6 @@ class IntegrationsService:
         )
         self.session.commit()
 
-        # Process parsed items
         items_processed = 0
         items_created = 0
         items_updated = 0
@@ -170,7 +291,6 @@ class IntegrationsService:
                     }
                 )
 
-        # Determine final status
         if items_failed == 0:
             final_status = SyncRunStatus.SUCCESS
         elif items_created + items_updated > 0:
@@ -327,6 +447,23 @@ class IntegrationsService:
                     record.first_watched_at = item.watched_date
                     is_updated = True
 
+            # If WATCHED item has an associated rating, apply it
+            if item.rating is not None:
+                score = (
+                    item.rating * 2.0
+                    if scale_mode == RatingScaleMode.TEN_POINT
+                    else item.rating
+                )
+                if (
+                    conflict_policy == ConflictPolicy.PRESERVE_LOCAL
+                    and record.user_rating is not None
+                ):
+                    pass
+                else:
+                    if record.user_rating != score:
+                        record.user_rating = score
+                        is_updated = True
+
         # 3. Rating handling
         elif item.entry_type == LetterboxdItemType.RATING:
             if item.rating is not None:
@@ -346,6 +483,12 @@ class IntegrationsService:
                     if record.user_rating != score:
                         record.user_rating = score
                         is_updated = True
+
+                if record.watch_status == WatchStatus.UNWATCHED:
+                    record.watch_status = WatchStatus.COMPLETED
+                    if record.watch_count == 0:
+                        record.watch_count = 1
+                    is_updated = True
 
         # 4. Diary entry handling
         elif item.entry_type == LetterboxdItemType.DIARY:

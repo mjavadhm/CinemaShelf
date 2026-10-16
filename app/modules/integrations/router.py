@@ -12,6 +12,10 @@ from app.modules.integrations.schemas import (
     ConflictPolicy,
     ExternalItemMappingResponse,
     ImportSummaryResponse,
+    LetterboxdBrowserSyncRequest,
+    LetterboxdLocalSyncRequest,
+    LetterboxdRateRequest,
+    LetterboxdRateResponse,
     RatingScaleMode,
     SyncRunResponse,
 )
@@ -53,6 +57,74 @@ async def import_letterboxd_file(
         filename=filename,
         conflict_policy=conflict_policy,
         scale_mode=scale_mode,
+    )
+
+
+@router.post(
+    "/letterboxd/sync-local-html",
+    response_model=ImportSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Import Letterboxd data from saved local HTML files",
+)
+async def sync_letterboxd_local_html(
+    request: LetterboxdLocalSyncRequest,
+    service: Annotated[IntegrationsService, Depends(get_integrations_service)],
+) -> ImportSummaryResponse:
+    """Parse local HTML exports in a directory (e.g. 'for scraping') and ingest films and ratings."""
+    return await service.import_local_folder(
+        folder_path=request.folder_path,
+        conflict_policy=request.conflict_policy,
+        scale_mode=request.scale_mode,
+    )
+
+
+@router.post(
+    "/letterboxd/browser-sync",
+    response_model=ImportSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Scrape user Letterboxd data using automated browser",
+)
+async def sync_letterboxd_via_browser(
+    request: LetterboxdBrowserSyncRequest,
+    service: Annotated[IntegrationsService, Depends(get_integrations_service)],
+) -> ImportSummaryResponse:
+    """Automate Chromium browser to scrape user films (with pagination) and watchlist from Letterboxd."""
+    return await service.sync_via_browser(
+        username=request.username,
+        include_watchlist=request.include_watchlist,
+        max_pages=request.max_pages,
+        conflict_policy=request.conflict_policy,
+        scale_mode=request.scale_mode,
+    )
+
+
+@router.post(
+    "/letterboxd/open-browser",
+    status_code=status.HTTP_200_OK,
+    summary="Open visible browser to log into Letterboxd",
+)
+def open_letterboxd_browser(
+    service: Annotated[IntegrationsService, Depends(get_integrations_service)],
+    url: Annotated[str, Query(description="Target URL to open")] = "https://letterboxd.com",
+) -> dict[str, str]:
+    """Launch the browser with persistent profile so the user can log in to Letterboxd."""
+    return service.open_letterboxd_browser(url=url)
+
+
+@router.post(
+    "/letterboxd/rate",
+    response_model=LetterboxdRateResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Submit movie rating to Letterboxd",
+)
+def rate_movie_on_letterboxd(
+    request: LetterboxdRateRequest,
+    service: Annotated[IntegrationsService, Depends(get_integrations_service)],
+) -> LetterboxdRateResponse:
+    """Open Letterboxd via browser and set star rating for a movie."""
+    return service.rate_movie_on_letterboxd(
+        work_id=request.work_id,
+        rating=request.rating,
     )
 
 

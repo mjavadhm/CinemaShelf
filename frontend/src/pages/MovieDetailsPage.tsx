@@ -14,11 +14,13 @@ import {
   Loader2,
   ExternalLink,
   Search,
+  Globe,
 } from 'lucide-react';
 import { useWorkDetails } from '../hooks/useWorkDetails';
 import { usePersonalActions } from '../hooks/usePersonalActions';
 import { usePlaybackLaunch } from '../hooks/usePlaybackLaunch';
 import { useSearchAndAddWork, useWorkReleases } from '../hooks/useSearchAndAddWork';
+import { rateMovieOnLetterboxd } from '../api/endpoints';
 import { getTmdbImageUrl } from '../types/api';
 
 export const MovieDetailsPage: React.FC = () => {
@@ -43,6 +45,30 @@ export const MovieDetailsPage: React.FC = () => {
   const [playbackFeedback, setPlaybackFeedback] = useState<string | null>(null);
   const [downloadSuccessId, setDownloadSuccessId] = useState<number | null>(null);
   const [hoverRating, setHoverRating] = useState<number | null>(null);
+  const [isSubmittingToLetterboxd, setIsSubmittingToLetterboxd] = useState(false);
+  const [letterboxdFeedback, setLetterboxdFeedback] = useState<string | null>(null);
+
+  const handleRateOnLetterboxd = async () => {
+    if (!work) return;
+    const ratingToSubmit = personalRecord?.user_rating ?? (hoverRating || 10);
+    try {
+      setIsSubmittingToLetterboxd(true);
+      setLetterboxdFeedback(null);
+      const res = await rateMovieOnLetterboxd(work.id, Math.round(ratingToSubmit));
+      setLetterboxdFeedback(res.message || 'نمره در Letterboxd ثبت شد!');
+      refetchAll();
+      setTimeout(() => setLetterboxdFeedback(null), 4000);
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.error?.message ||
+        err.message ||
+        'خطا در ثبت نمره در Letterboxd';
+      setLetterboxdFeedback(msg);
+      setTimeout(() => setLetterboxdFeedback(null), 6000);
+    } finally {
+      setIsSubmittingToLetterboxd(false);
+    }
+  };
 
   const copyPath = (fileId: number, path: string) => {
     navigator.clipboard.writeText(path);
@@ -238,35 +264,63 @@ export const MovieDetailsPage: React.FC = () => {
             </div>
 
             {/* Interactive User Rating Row */}
-            <div className="bg-shelf-bg/60 border border-shelf-border/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 max-w-md">
-              <span className="text-xs text-slate-300 font-medium">امتیاز دهید:</span>
-              <div className="flex items-center gap-1" dir="ltr">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => {
-                  const active =
-                    (hoverRating !== null && star <= hoverRating) ||
-                    (hoverRating === null && currentRating != null && star <= Math.round(currentRating));
-                  return (
-                    <button
-                      key={star}
-                      onClick={() => handleRate(star)}
-                      onMouseEnter={() => setHoverRating(star)}
-                      onMouseLeave={() => setHoverRating(null)}
-                      disabled={isRating}
-                      className="p-0.5 text-slate-600 hover:scale-125 transition-transform"
-                      title={`${star} از ۱۰`}
-                    >
-                      <Star
-                        className={`w-3.5 h-3.5 ${
-                          active
-                            ? 'text-shelf-amber fill-shelf-amber'
-                            : 'text-slate-600'
-                        }`}
-                      />
-                    </button>
-                  );
-                })}
+            <div className="bg-shelf-bg/60 border border-shelf-border/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 max-w-lg">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-300 font-medium">امتیاز دهید:</span>
+                <div className="flex items-center gap-1" dir="ltr">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => {
+                    const active =
+                      (hoverRating !== null && star <= hoverRating) ||
+                      (hoverRating === null && currentRating != null && star <= Math.round(currentRating));
+                    return (
+                      <button
+                        key={star}
+                        onClick={() => handleRate(star)}
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(null)}
+                        disabled={isRating}
+                        className="p-0.5 text-slate-600 hover:scale-125 transition-transform"
+                        title={`${star} از ۱۰`}
+                      >
+                        <Star
+                          className={`w-3.5 h-3.5 ${
+                            active
+                              ? 'text-shelf-amber fill-shelf-amber'
+                              : 'text-slate-600'
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Letterboxd Rate Trigger Button */}
+              <button
+                type="button"
+                onClick={handleRateOnLetterboxd}
+                disabled={isSubmittingToLetterboxd || !currentRating}
+                title={
+                  currentRating
+                    ? `ثبت نمره ${Math.round(currentRating)} از ۱۰ در Letterboxd با مرورگر`
+                    : 'ابتدا نمره دهید تا در Letterboxd ثبت شود'
+                }
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] font-medium flex items-center gap-1.5 transition disabled:opacity-40"
+              >
+                {isSubmittingToLetterboxd ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Globe className="w-3 h-3" />
+                )}
+                <span>ثبت در Letterboxd</span>
+              </button>
             </div>
+
+            {letterboxdFeedback && (
+              <div className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 inline-block">
+                {letterboxdFeedback}
+              </div>
+            )}
 
             {work.overview && (
               <p className="text-sm text-slate-300 leading-relaxed pt-2 line-clamp-4">

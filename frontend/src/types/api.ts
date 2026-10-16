@@ -245,18 +245,45 @@ export interface SyncRun {
 }
 
 export interface ImportSummary {
-  run_id: number;
-  movies_imported: number;
-  ratings_imported: number;
-  reviews_imported: number;
-  watchlist_imported: number;
-  unmatched_count: number;
-  unmatched_entries: Array<{
+  message?: string;
+  total_items?: number;
+  watchlist_count?: number;
+  ratings_count?: number;
+  watched_count?: number;
+  diary_count?: number;
+  lists_count?: number;
+  sync_run?: {
+    id: number;
+    provider: string;
+    sync_type: string;
+    status: string;
+    items_processed: number;
+    items_created: number;
+    items_updated: number;
+    items_failed: number;
+    started_at: string;
+    finished_at?: string | null;
+  };
+  run_id?: number;
+  movies_imported?: number;
+  ratings_imported?: number;
+  reviews_imported?: number;
+  watchlist_imported?: number;
+  unmatched_count?: number;
+  unmatched_entries?: Array<{
     title: string;
     year?: number | null;
     letterboxd_uri?: string | null;
     reason: string;
   }>;
+}
+
+export interface LetterboxdRateResult {
+  work_id: number;
+  title: string;
+  rating: number;
+  success: boolean;
+  message: string;
 }
 
 export interface FileAccessResult {

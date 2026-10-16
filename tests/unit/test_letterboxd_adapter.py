@@ -143,3 +143,98 @@ def test_parse_zip_export(adapter: LetterboxdClient) -> None:
 def test_parse_invalid_zip_raises_error(adapter: LetterboxdClient) -> None:
     with pytest.raises(ValueError, match="Invalid ZIP archive"):
         adapter.parse_zip_export(b"this is not a zip file")
+
+
+def test_parse_html_films_with_ratings(adapter: LetterboxdClient) -> None:
+    html = """
+    <html>
+      <head><title>‎myuser’s films • Letterboxd</title></head>
+      <body>
+        <ul class="poster-list">
+          <li class="griditem">
+            <div class="react-component" data-component-class="LazyPoster" data-item-name="Blade Runner 2049 (2017)" data-item-slug="blade-runner-2049">
+              <div class="poster"><img alt="Poster for Blade Runner 2049"></div>
+            </div>
+            <p class="poster-viewingdata"><span class="rating rated-8">★★★★</span></p>
+          </li>
+          <li class="griditem">
+            <div class="react-component" data-component-class="LazyPoster" data-item-name="Dune (2021)" data-item-slug="dune-2021">
+            </div>
+            <p class="poster-viewingdata"><span class="rating rated-10">★★★★★</span></p>
+          </li>
+        </ul>
+        <div class="paginate-nextprev"><a class="next" href="/myuser/films/page/2/">Older</a></div>
+      </body>
+    </html>
+    """
+    items, next_url = adapter.parse_html(html)
+    assert len(items) == 2
+    assert next_url == "https://letterboxd.com/myuser/films/page/2/"
+
+    assert items[0].title == "Blade Runner 2049"
+    assert items[0].release_year == 2017
+    assert items[0].letterboxd_uri == "https://letterboxd.com/film/blade-runner-2049/"
+    assert items[0].rating == 4.0
+    assert items[0].entry_type == LetterboxdItemType.WATCHED
+
+    assert items[1].title == "Dune"
+    assert items[1].release_year == 2021
+    assert items[1].rating == 5.0
+
+
+def test_parse_html_watchlist(adapter: LetterboxdClient) -> None:
+    html = """
+    <html>
+      <head><title>‎myuser’s Watchlist • Letterboxd</title></head>
+      <body>
+        <ul>
+          <li class="griditem">
+            <div class="react-component" data-component-class="LazyPoster" data-item-name="Past Lives (2023)" data-item-slug="past-lives"></div>
+          </li>
+        </ul>
+      </body>
+    </html>
+    """
+    items, next_url = adapter.parse_html(html)
+    assert len(items) == 1
+    assert next_url is None
+    assert items[0].title == "Past Lives"
+    assert items[0].release_year == 2023
+    assert items[0].entry_type == LetterboxdItemType.WATCHLIST
+
+
+def test_parse_html_single_film_page(adapter: LetterboxdClient) -> None:
+    html = """
+    <html>
+      <head>
+        <title>ASTRO (2024) directed by Tim Ewalts • Reviews, film + cast • Letterboxd</title>
+        <meta property="og:title" content="ASTRO (2024)" />
+        <meta property="og:url" content="https://letterboxd.com/film/astro-2024/" />
+      </head>
+      <body>
+        <section id="userpanel" class="actions-panel">
+          <input type="radio" value="7" checked="" />
+        </section>
+      </body>
+    </html>
+    """
+    items, next_url = adapter.parse_html(html)
+    assert len(items) == 1
+    assert next_url is None
+    assert items[0].title == "ASTRO"
+    assert items[0].release_year == 2024
+    assert items[0].letterboxd_uri == "https://letterboxd.com/film/astro-2024/"
+    assert items[0].rating == 3.5  # 7 / 2.0
+
+
+def test_parse_local_scraping_folder(adapter: LetterboxdClient) -> None:
+    from pathlib import Path
+    if not Path("for scraping").is_dir():
+        pytest.skip("for scraping directory not found")
+
+    items = adapter.parse_local_folder("for scraping")
+    assert len(items) == 124
+    watched_items = [i for i in items if i.entry_type == LetterboxdItemType.WATCHED]
+    watchlist_items = [i for i in items if i.entry_type == LetterboxdItemType.WATCHLIST]
+    assert len(watched_items) == 72
+    assert len(watchlist_items) == 52
